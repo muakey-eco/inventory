@@ -30,10 +30,13 @@ return [
 
     // Đăng nhập nhân viên qua OIDC (ADR 0008). Issuer là URL của provider trên Authentik, dạng
     // https://auth.example/application/o/<slug>/; kho tự đọc các endpoint từ discovery của nó.
+    // api_token là token chỉ đọc của service account, dùng cho đối soát nhân viên mỗi phút;
+    // API gọi ở cùng gốc với issuer.
     'authentik' => [
         'issuer' => env('AUTHENTIK_ISSUER'),
         'client_id' => env('AUTHENTIK_CLIENT_ID'),
         'client_secret' => env('AUTHENTIK_CLIENT_SECRET'),
+        'api_token' => env('AUTHENTIK_API_TOKEN'),
     ],
 
     'slack' => [

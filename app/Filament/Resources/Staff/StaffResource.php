@@ -21,10 +21,10 @@ use Filament\Tables\Table;
 use UnitEnum;
 
 /**
- * Danh sách nhân viên trong panel. Nhân viên, tên, email và Vai trò đều đến từ Authentik
- * (ADR 0008), nên ở đây chỉ đọc; thao tác duy nhất là Khoá nhân viên và mở khoá. Adapter
- * mỏng: mọi thao tác gọi StaffManager, nơi kiểm tra Vai trò, chặn khoá Quản trị đang hoạt
- * động cuối cùng và ghi Nhật ký bảo mật. Không có thao tác xoá nhân viên.
+ * Danh sách nhân viên trong panel. Nhân viên, tên, email, Vai trò và việc còn quyền vào kho
+ * đều đến từ Authentik (ADR 0008), nên ở đây chỉ đọc; thao tác duy nhất là Khoá nhân viên và
+ * mở khoá. Adapter mỏng: mọi thao tác gọi StaffManager, nơi kiểm tra Vai trò, chặn khoá Quản
+ * trị đang hoạt động cuối cùng và ghi Nhật ký bảo mật. Không có thao tác xoá nhân viên.
  */
 class StaffResource extends Resource
 {
@@ -68,10 +68,22 @@ class StaffResource extends Resource
                     ))
                     ->formatStateUsing(fn (string $state): string => Role::from($state)->label()),
                 TextColumn::make('deactivated_at')
-                    ->label('Trạng thái')
+                    ->label('Khoá nhân viên')
                     ->badge()
                     ->state(fn (User $record): string => $record->isDeactivated() ? 'Đã khoá' : 'Hoạt động')
                     ->color(fn (User $record): string => $record->isDeactivated() ? 'danger' : 'success'),
+                // Tách cột với Khoá nhân viên: mất quyền theo Authentik tự hết khi Authentik cấp
+                // lại, còn Khoá nhân viên thì chỉ Quản trị mở được.
+                TextColumn::make('authentik_revoked_at')
+                    ->label('Authentik')
+                    ->badge()
+                    ->state(fn (User $record): string => $record->authentik_revoked_reason === null
+                        ? 'Có quyền'
+                        : 'Mất quyền: '.$record->authentik_revoked_reason->label())
+                    ->tooltip(fn (User $record): ?string => $record->authentik_revoked_at === null
+                        ? null
+                        : 'Từ '.$record->authentik_revoked_at->format('H:i d/m/Y'))
+                    ->color(fn (User $record): string => $record->isRevokedByAuthentik() ? 'warning' : 'success'),
             ])
             ->recordActions([
                 Action::make('deactivate')

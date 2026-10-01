@@ -58,7 +58,7 @@ Kho không có lệnh tạo Quản trị đầu tiên: Quản trị đầu tiên
 
 ### Đăng nhập qua Authentik
 
-Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò** ([ADR 0008](docs/adr/0008-authentik-lam-chu-xac-thuc-va-vai-tro.md)): kho không có mật khẩu, không có 2FA riêng, không có đường phá kính. Mỗi lần đăng nhập, kho đồng bộ tên, email và Vai trò của nhân viên theo Authentik. Cấu hình một lần trên Authentik:
+Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò** ([ADR 0008](docs/adr/0008-authentik-lam-chu-xac-thuc-va-vai-tro.md)): kho không có mật khẩu, không có 2FA riêng, không có đường phá kính. Mỗi lần đăng nhập, và mỗi phút qua đối soát (xem [Đối soát nhân viên](#đối-soát-nhân-viên-với-authentik)), kho đồng bộ tên, email và Vai trò của nhân viên theo Authentik. Cấu hình một lần trên Authentik:
 
 1. **Ba group**, mỗi group một Vai trò: `kho-quan-tri` (Quản trị), `kho-nhap-kho` (Nhập kho), `kho-ban-hang` (Bán hàng). Người không ở group `kho-*` nào bị kho từ chối.
 2. **Scope mapping** (Customization → Property Mappings → Scope Mapping), scope name `kho`, expression:
@@ -85,6 +85,24 @@ AUTHENTIK_CLIENT_SECRET=
 ```
 
 Đăng xuất ở kho chỉ huỷ phiên kho, không đụng phiên Authentik. Mọi lần từ chối (không có Vai trò, bị Khoá nhân viên, state/nonce sai, Authentik báo lỗi) dừng ở một trang tĩnh có nút Thử lại, không tự chuyển hướng.
+
+### Đối soát nhân viên với Authentik
+
+Service `scheduler` chạy `inventory:staff:sync` **mỗi phút**: kho đọc `GET /api/v3/core/users/?uuid=…` (cùng gốc với `AUTHENTIK_ISSUER`; mỗi nhân viên một lần gọi vì bộ lọc `uuid` chỉ nhận một giá trị) cho các nhân viên đã có trong kho, không tạo sẵn người chưa từng đăng nhập. Ai bị tắt (`is_active=false`), bị xoá, hoặc không còn group `kho-*` nào thì **mất quyền theo Authentik**: phiên đang mở bị đăng xuất ở request kế tiếp. Authentik cấp lại thì tự có lại quyền, trừ khi đang bị **Khoá nhân viên** — đối soát không bao giờ mở khoá đó. Tên, email, Vai trò cũng đồng bộ theo; Vai trò đổi hay mất/có lại quyền đều ghi Nhật ký bảo mật (`via: authentik_sync`). Trang Nhân viên hiện hai cột riêng: Khoá nhân viên và Authentik.
+
+Authentik lỗi (mạng, 5xx, token sai/thiếu quyền, trả sai dạng) thì kho **giữ nguyên quyền hiện có** và ghi log. Không chạy được liên tục từ 5 phút (Authentik lỗi, scheduler chết, hay lệnh vỡ vì lỗi khác) thì trang Tổng quan hiện cảnh báo cho Quản trị, tự biến mất khi đối soát chạy lại được; trong lúc đó cần chặn ai ngay thì dùng Khoá nhân viên.
+
+Cấu hình một lần trên Authentik:
+
+1. **Service account** (Directory → Users → Create Service Account), ví dụ `kho-sync`. Bỏ chọn tạo token có hạn.
+2. **Role** (Directory → Roles) có hai quyền `authentik_core.view_user` (Can view User) và `authentik_core.view_group` (Can view Group), gán cho service account (trực tiếp, hoặc qua một group chỉ chứa nó). Không cấp quyền ghi nào.
+3. **Token** (Directory → Tokens and App passwords → Create) cho service account: Intent **API Token**, **bỏ Expiring**. Token có hạn bị Authentik tự xoay giá trị khi hết hạn, kho sẽ mất kết nối mà không ai đổi `.env`.
+
+Rồi điền vào `app.env`:
+
+```bash
+AUTHENTIK_API_TOKEN=
+```
 
 ### Deploy
 

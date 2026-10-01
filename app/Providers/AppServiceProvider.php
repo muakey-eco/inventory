@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Http\Responses\SignedOutResponse;
 use App\Inventory\Encryption\KeyFingerprints;
 use App\Listeners\RecordAuthenticationEvents;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\WorkerStarting;
 use Illuminate\Support\Facades\Event;
@@ -16,7 +18,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LogoutResponse::class, SignedOutResponse::class);
     }
 
     /**

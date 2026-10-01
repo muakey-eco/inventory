@@ -71,7 +71,7 @@ beforeEach(function () {
 });
 
 it('cả ba vai trò vào được báo cáo Tồn kho và thấy widget cảnh báo; nhân viên không có vai trò thì không', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->withTwoFactor()->create() : staffMember($role));
+    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
 
     $this->get(StockReportPage::getUrl())->assertStatus($sees ? 200 : 403);
     expect(StockAlerts::canView())->toBe($sees);

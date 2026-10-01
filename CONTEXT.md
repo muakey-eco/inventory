@@ -22,7 +22,7 @@ _Avoid_: key, serial (khi cần phân biệt với **Tài khoản**)
 
 **Tài khoản** (Account):
 Một đơn vị hàng là thông tin đăng nhập (username, password, có thể kèm email khôi phục hoặc 2FA). Tài khoản có thể chia thành nhiều slot để bán cho nhiều khách, có thể có thời hạn và có thể phải bảo hành.
-_Avoid_: acc, nick
+_Avoid_: acc, nick; tài khoản (khi nói về chỗ đăng nhập của nhân viên, đó là người dùng trên Authentik)
 
 **Đơn vị hàng** (Stock unit):
 Một thứ cụ thể nằm trong kho: một **Mã dùng một lần** hoặc một **Tài khoản**. Có trạng thái Hoạt động, Lỗi, Đã huỷ hoặc Đã huỷ nhập; khi Lỗi hoặc Đã huỷ thì mọi **Slot** còn trong kho của nó không bán được. Mang **Giá vốn** của cả đơn vị.
@@ -177,7 +177,7 @@ Giá shop trả cho một **Đơn vị hàng**, ghi khi nhập theo **Lô nhập
 Nhật ký chỉ-ghi-thêm mọi lần chuyển trạng thái của **Slot** và **Đơn vị hàng**: ai, khi nào, từ trạng thái nào sang trạng thái nào, lý do. Tách biệt với **Nhật ký xem mã**.
 
 **Vai trò** (Role):
-Nhóm quyền gán cho một nhân viên. Có ba vai trò: **Quản trị** (chủ shop, mọi quyền), **Nhập kho** (nhập hàng, làm việc với **Nhà cung cấp**) và **Bán hàng** (xuất kho và xử lý sau giao). Một nhân viên có thể mang nhiều vai trò; không gán quyền lẻ cho từng người. Luôn còn ít nhất một Quản trị đang hoạt động.
+Nhóm quyền của một nhân viên. Có ba vai trò: **Quản trị** (chủ shop, mọi quyền), **Nhập kho** (nhập hàng, làm việc với **Nhà cung cấp**) và **Bán hàng** (xuất kho và xử lý sau giao). Một nhân viên có thể mang nhiều vai trò; không gán quyền lẻ cho từng người. Vai trò được gán trên Authentik, kho chỉ nhận theo, nên việc còn ít nhất một Quản trị là trách nhiệm của người quản Authentik, kho không chặn được (ADR 0008).
 _Trong code_: **Quản trị** là `Role::Owner`, giá trị `owner` (không phải `admin`, vốn dễ nhầm với **Người vận hành server**). **Nhập kho** và **Bán hàng** vẫn là `Role::NhapKho`, `Role::BanHang`.
 
 **Ngữ cảnh xem mã** (Reveal context):
@@ -187,10 +187,10 @@ Bản ghi mà qua đó nội dung đầy đủ của một **Slot** được hi�
 Nhật ký chỉ-ghi-thêm mỗi lần nội dung đầy đủ bị hiển thị hoặc tải về: ai (nhân viên hoặc **Khoá API**), khi nào, Slot nào, **Ngữ cảnh xem mã**, lý do. Không chứa nội dung mã, không ghi thao tác Copy, trừ Copy tất cả khi màn kết quả chỉ hiện dạng che (từ 50 **Slot** trở lên); lưu vĩnh viễn, chỉ **Quản trị** xem được.
 
 **Nhật ký bảo mật** (Security log):
-Nhật ký chỉ-ghi-thêm các sự kiện về quyền truy cập: đăng nhập, sai 2FA, reset 2FA, tạo hoặc **Khoá nhân viên**, đổi **Vai trò**, tạo, thu hồi hoặc xoay **Khoá API**, đăng ký dấu vân tay hoặc xoay khoá mã hoá của kho, bật hoặc tắt **Tạm dừng xuất kho**. Không bao giờ chứa giá trị khoá. Lưu vĩnh viễn, chỉ **Quản trị** xem được.
+Nhật ký chỉ-ghi-thêm các sự kiện về quyền truy cập: đăng nhập, đăng nhập bị từ chối, đăng nhập thiếu bằng chứng MFA, nhân viên xuất hiện lần đầu, **Khoá nhân viên** hoặc mở khoá, **Vai trò** đổi theo Authentik (ghi điều kho nhận thấy; ai bấm bên Authentik thì nằm ở nhật ký của Authentik), tạo, thu hồi hoặc xoay **Khoá API**, đăng ký dấu vân tay hoặc xoay khoá mã hoá của kho, bật hoặc tắt **Tạm dừng xuất kho**. Không bao giờ chứa giá trị khoá. Lưu vĩnh viễn, chỉ **Quản trị** xem được.
 
 **Khoá nhân viên** (Deactivate staff):
-Chặn một nhân viên đăng nhập, có hiệu lực ngay kể cả phiên đang mở. Nhân viên không bao giờ bị xoá vì các nhật ký tham chiếu tới họ.
+Công tắc khẩn cấp của **Quản trị** tại kho: chặn một nhân viên, có hiệu lực ngay kể cả phiên đang mở, độc lập với Authentik và chỉ Quản trị (hoặc **Người vận hành server**) mở lại được. Nhân viên bị tắt trên Authentik hoặc không còn **Vai trò** nào cũng mất quyền vào kho, nhưng đó không phải Khoá nhân viên và tự hết khi Authentik cấp lại. Nhân viên không bao giờ bị xoá vì các nhật ký tham chiếu tới họ.
 _Avoid_: xoá nhân viên
 
 **Người vận hành server** (Server operator):

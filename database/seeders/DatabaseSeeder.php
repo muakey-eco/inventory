@@ -15,5 +15,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RoleSeeder::class);
+
+        // Production có nhân viên thật từ Authentik; nhân viên giả chỉ để đăng nhập dev.
+        if (app()->isLocal()) {
+            $this->call(DevStaffSeeder::class);
+        }
     }
 }

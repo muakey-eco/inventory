@@ -28,11 +28,11 @@ pest()->extend(TestCase::class)
     ->in('Concurrency');
 
 /**
- * Nhân viên đã bật 2FA, mang các Vai trò cho trước. Cần chạy RoleSeeder trước.
+ * Nhân viên mang các Vai trò cho trước. Cần chạy RoleSeeder trước.
  */
 function staffMember(Role ...$roles): User
 {
-    return tap(User::factory()->withTwoFactor()->create())->assignRole($roles);
+    return tap(User::factory()->create())->assignRole($roles);
 }
 
 /**

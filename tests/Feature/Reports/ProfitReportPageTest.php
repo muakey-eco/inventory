@@ -73,7 +73,7 @@ beforeEach(function () {
 });
 
 it('chỉ Quản trị vào được ba trang báo cáo Lãi/lỗ', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->withTwoFactor()->create() : staffMember($role));
+    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
 
     foreach ([ProfitReportPage::getUrl(), DispatchProfitReportPage::getUrl(), SupplierLossReportPage::getUrl()] as $url) {
         $this->get($url)->assertStatus($sees ? 200 : 403);

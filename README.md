@@ -16,13 +16,10 @@ for k in CONTENT HMAC BACKUP; do
 done
 docker compose run --rm app php artisan migrate --seed
 docker compose run --rm app php artisan inventory:keys:register
-docker compose run --rm app php artisan staff:create-first-owner
 docker compose up -d
 ```
 
-`staff:create-first-owner` hỏi tên, email và mật khẩu ban đầu ngay trên terminal, nên mật khẩu không nằm lại trong lịch sử shell. Lệnh chạy được đúng một lần: kho đã có Quản trị (kể cả Quản trị đang bị Khoá nhân viên) thì nó từ chối, vì từ đó Quản trị tự tạo nhân viên ở trang Nhân viên.
-
-Panel ở <http://localhost:8080/admin>. Mọi nhân viên phải bật 2FA (TOTP) ngay sau lần đăng nhập đầu tiên.
+Panel ở <http://localhost:8080/admin>. Nhân viên đăng nhập qua Authentik (xem [Đăng nhập qua Authentik](#đăng-nhập-qua-authentik)). Máy dev chưa có Authentik thì vào <http://localhost:8080/admin/auth/dev>: `migrate --seed` ở `APP_ENV=local` tạo sẵn một nhân viên cho mỗi Vai trò, chọn một người là vào thẳng. Route này chỉ tồn tại khi `APP_ENV=local`.
 
 Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev server ở cổng 5173, không cần cài Node trên máy. Mở app ở địa chỉ khác `localhost` (ví dụ qua Tailscale) thì đặt `VITE_ORIGIN` và `VITE_HMR_HOST` cho khớp.
 
@@ -39,7 +36,7 @@ FrankenPHP chỉ nghe `127.0.0.1:8000`, không mở ra Internet. Proxy phải ch
 ```bash
 mkdir -p /srv/inventory
 # chép docker/prod/app.env.example và compose.prod.yaml từ repo sang /srv/inventory/
-vi /srv/inventory/app.env        # điền APP_KEY, ba khoá INVENTORY_*, mật khẩu DB, APP_URL
+vi /srv/inventory/app.env        # điền APP_KEY, ba khoá INVENTORY_*, mật khẩu DB, APP_URL, AUTHENTIK_*
 chmod 600 /srv/inventory/app.env
 ```
 
@@ -47,7 +44,7 @@ Khoá sinh như ở phần Chạy lần đầu (`openssl rand -base64 32`, dạn
 
 ### Lần dựng đầu trên VPS trắng
 
-`migrate` tự chạy mỗi lần deploy, nhưng dấu vân tay khoá, Vai trò và Quản trị đầu tiên thì không — và service `app` từ chối khởi động khi khoá chưa đăng ký, nên ba lệnh này phải chạy **trước** lần `up` đầu tiên:
+`migrate` tự chạy mỗi lần deploy, nhưng dấu vân tay khoá và Vai trò thì không — và service `app` từ chối khởi động khi khoá chưa đăng ký, nên các lệnh này phải chạy **trước** lần `up` đầu tiên:
 
 ```bash
 cd /srv/inventory
@@ -55,8 +52,39 @@ export INVENTORY_IMAGE=ghcr.io/nghianb/inventory:git-<sha>
 docker compose -f compose.prod.yaml run --rm migrate
 docker compose -f compose.prod.yaml run --rm --no-deps app php artisan inventory:keys:register
 docker compose -f compose.prod.yaml run --rm --no-deps app php artisan db:seed --class=RoleSeeder --force
-docker compose -f compose.prod.yaml run --rm --no-deps app php artisan staff:create-first-owner
 ```
+
+Kho không có lệnh tạo Quản trị đầu tiên: Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho-quan-tri` đăng nhập qua Authentik.
+
+### Đăng nhập qua Authentik
+
+Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò** ([ADR 0008](docs/adr/0008-authentik-lam-chu-xac-thuc-va-vai-tro.md)): kho không có mật khẩu, không có 2FA riêng, không có đường phá kính. Mỗi lần đăng nhập, kho đồng bộ tên, email và Vai trò của nhân viên theo Authentik. Cấu hình một lần trên Authentik:
+
+1. **Ba group**, mỗi group một Vai trò: `kho-quan-tri` (Quản trị), `kho-nhap-kho` (Nhập kho), `kho-ban-hang` (Bán hàng). Người không ở group `kho-*` nào bị kho từ chối.
+2. **Scope mapping** (Customization → Property Mappings → Scope Mapping), scope name `kho`, expression:
+
+   ```python
+   return {"kho_groups": [group.name for group in request.user.ak_groups.filter(name__startswith="kho-")]}
+   ```
+
+   Claim phải tên `kho_groups`, không phải `groups`: scope `profile` mặc định đã trả `groups` gồm mọi group, và Authentik nối list khi trộn claim cùng tên nên bộ lọc mất tác dụng.
+3. **Provider** OAuth2/OpenID:
+   - Client type **Confidential**. Redirect URI (strict): `https://<APP_URL>/admin/auth/callback`.
+   - **Signing key**: chọn một certificate. Kho chỉ nhận id_token ký RS256 qua JWKS; để trống thì Authentik ký HS256 và mọi lần đăng nhập bị từ chối.
+   - **Subject mode**: *Based on the User's UUID* (`user_uuid`). Kho khớp nhân viên theo `sub`, nên đổi subject mode sau này là mọi người thành nhân viên mới.
+   - Scopes: `openid`, `profile`, `email` mặc định cộng scope mapping `kho` ở bước 2. Bật **Include claims in id_token**: kho đọc tên, email và `kho_groups` từ id_token, không gọi userinfo.
+4. **Application** gắn provider trên, kèm policy/binding chỉ cho thành viên ba group `kho-*` vào.
+5. **Flow** xác thực của Application phải bắt MFA (stage Authenticator Validation, không để "skip" khi người dùng chưa có thiết bị). Kho không chặn theo `amr`, chỉ ghi Nhật ký bảo mật "Đăng nhập thiếu bằng chứng MFA" khi `amr` thiếu `mfa` (Authentik bỏ `mfa` cả khi stage MFA được bỏ qua nhờ cookie).
+
+Rồi điền vào `app.env`:
+
+```bash
+AUTHENTIK_ISSUER=https://auth.example.com/application/o/<slug-của-application>/
+AUTHENTIK_CLIENT_ID=
+AUTHENTIK_CLIENT_SECRET=
+```
+
+Đăng xuất ở kho chỉ huỷ phiên kho, không đụng phiên Authentik. Mọi lần từ chối (không có Vai trò, bị Khoá nhân viên, state/nonce sai, Authentik báo lỗi) dừng ở một trang tĩnh có nút Thử lại, không tự chuyển hướng.
 
 ### Deploy
 
@@ -223,13 +251,13 @@ Khoá nội dung, khoá HMAC và khoá backup nằm trong `.env`, tách khỏi `
 
 ## Khôi phục quyền Quản trị
 
-Khi Quản trị tự khoá mình ngoài hệ thống (bị Khoá nhân viên, mất thiết bị 2FA), người vận hành server chạy:
+Khi Quản trị bị Khoá nhân viên mà không còn Quản trị nào khác mở được, người vận hành server chạy:
 
 ```bash
-docker compose run --rm app php artisan staff:recover-owner chu@shop.test --unlock --reset-2fa
+docker compose run --rm app php artisan staff:recover-owner chu@shop.test --unlock
 ```
 
-Chỉ áp dụng cho nhân viên mang Vai trò Quản trị; mỗi thao tác ghi Nhật ký bảo mật.
+Chỉ áp dụng cho nhân viên mang Vai trò Quản trị; mỗi lần ghi Nhật ký bảo mật. Mất thiết bị MFA hay quên mật khẩu thì xử lý trên Authentik, không phải ở kho.
 
 ## Kiểm tra
 

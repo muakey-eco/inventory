@@ -28,6 +28,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Đăng nhập nhân viên qua OIDC (ADR 0008). Issuer là URL của provider trên Authentik, dạng
+    // https://auth.example/application/o/<slug>/; kho tự đọc các endpoint từ discovery của nó.
+    'authentik' => [
+        'issuer' => env('AUTHENTIK_ISSUER'),
+        'client_id' => env('AUTHENTIK_CLIENT_ID'),
+        'client_secret' => env('AUTHENTIK_CLIENT_SECRET'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

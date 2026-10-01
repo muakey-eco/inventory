@@ -9,7 +9,6 @@ use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -26,44 +25,35 @@ it('chỉ Quản trị vào được trang Nhân viên', function (Role $role, i
     'Bán hàng' => [Role::BanHang, 403],
 ]);
 
-it('Quản trị tạo nhân viên từ panel', function () {
-    $this->actingAs($admin = staffMember(Role::Owner));
-
-    Livewire::test(ManageStaff::class)
-        ->callAction(CreateAction::class, data: [
-            'name' => 'Bình',
-            'email' => 'binh@shop.test',
-            'password' => 'mat-khau-ban-dau',
-            'roles' => [Role::BanHang->value],
-        ])
-        ->assertHasNoFormErrors();
-
-    $created = User::where('email', 'binh@shop.test')->sole();
-
-    expect($created->hasRole(Role::BanHang))->toBeTrue()
-        ->and(SecurityLogEntry::where('event', SecurityEvent::StaffCreated)->sole()->actor_id)->toBe($admin->id);
-});
-
-it('Quản trị đổi Vai trò, Khoá, mở khoá và reset 2FA từ panel', function () {
+it('không có thao tác tạo nhân viên, đổi Vai trò hay reset 2FA', function () {
     $this->actingAs(staffMember(Role::Owner));
     $seller = staffMember(Role::BanHang);
 
     Livewire::test(ManageStaff::class)
-        ->callAction(TestAction::make('changeRoles')->table($seller), data: ['roles' => [Role::NhapKho->value]])
-        ->callAction(TestAction::make('resetTwoFactor')->table($seller))
+        ->assertActionDoesNotExist(CreateAction::class)
+        ->assertActionDoesNotExist(TestAction::make('changeRoles')->table($seller))
+        ->assertActionDoesNotExist(TestAction::make('resetTwoFactor')->table($seller));
+});
+
+it('Vai trò hiện chỉ đọc trên danh sách', function () {
+    $this->actingAs(staffMember(Role::Owner));
+    $seller = staffMember(Role::BanHang, Role::NhapKho);
+
+    Livewire::test(ManageStaff::class)
+        ->assertTableColumnStateSet('roles.name', [Role::NhapKho->value, Role::BanHang->value], $seller);
+});
+
+it('Quản trị Khoá rồi mở khoá nhân viên từ panel', function () {
+    $this->actingAs(staffMember(Role::Owner));
+    $seller = staffMember(Role::BanHang);
+
+    Livewire::test(ManageStaff::class)
         ->callAction(TestAction::make('deactivate')->table($seller))
         ->assertActionHidden(TestAction::make('deactivate')->table($seller))
         ->callAction(TestAction::make('reactivate')->table($seller));
 
-    $seller->refresh();
-
-    expect($seller->hasRole(Role::NhapKho))->toBeTrue()
-        ->and($seller->hasRole(Role::BanHang))->toBeFalse()
-        ->and(AppAuthentication::make()->isEnabled($seller))->toBeFalse()
-        ->and($seller->isDeactivated())->toBeFalse()
+    expect($seller->fresh()->isDeactivated())->toBeFalse()
         ->and(SecurityLogEntry::pluck('event')->all())->toEqualCanonicalizing([
-            SecurityEvent::RolesChanged,
-            SecurityEvent::TwoFactorReset,
             SecurityEvent::StaffDeactivated,
             SecurityEvent::StaffReactivated,
         ]);

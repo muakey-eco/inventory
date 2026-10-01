@@ -78,7 +78,7 @@ beforeEach(function () {
 });
 
 it('chỉ Quản trị và Nhập kho vào được báo cáo Tỉ lệ lỗi', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->withTwoFactor()->create() : staffMember($role));
+    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
 
     $this->get(DefectRateReportPage::getUrl())->assertStatus($sees ? 200 : 403);
 })->with([

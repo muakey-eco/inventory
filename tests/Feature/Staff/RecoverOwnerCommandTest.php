@@ -5,7 +5,6 @@ use App\Inventory\Security\SecurityEvent;
 use App\Models\SecurityLogEntry;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -13,7 +12,7 @@ beforeEach(function () {
 
 function lockedOutOwner(string $email = 'chu@shop.test'): User
 {
-    return tap(User::factory()->withTwoFactor()->create([
+    return tap(User::factory()->create([
         'email' => $email,
         'deactivated_at' => now(),
     ]))->assignRole(Role::Owner);
@@ -26,7 +25,6 @@ it('mở khoá Quản trị từ server và ghi Nhật ký bảo mật', functio
         ->assertSuccessful();
 
     expect($admin->fresh()->isDeactivated())->toBeFalse()
-        ->and(AppAuthentication::make()->isEnabled($admin->fresh()))->toBeTrue()
         ->and(SecurityLogEntry::sole())
         ->event->toBe(SecurityEvent::StaffReactivated)
         ->user_id->toBe($admin->id)
@@ -34,35 +32,15 @@ it('mở khoá Quản trị từ server và ghi Nhật ký bảo mật', functio
         ->details->toBe(['via' => 'artisan']);
 });
 
-it('reset 2FA của Quản trị từ server và ghi Nhật ký bảo mật', function () {
-    $admin = lockedOutOwner();
+it('không còn tuỳ chọn reset 2FA', function () {
+    lockedOutOwner();
 
-    $this->artisan('staff:recover-owner', ['email' => 'chu@shop.test', '--reset-2fa' => true])
-        ->assertSuccessful();
-
-    expect(AppAuthentication::make()->isEnabled($admin->fresh()))->toBeFalse()
-        ->and($admin->fresh()->isDeactivated())->toBeTrue()
-        ->and(SecurityLogEntry::sole())
-        ->event->toBe(SecurityEvent::TwoFactorReset)
-        ->user_id->toBe($admin->id)
-        ->actor_id->toBeNull()
-        ->details->toBe(['via' => 'artisan']);
-});
-
-it('mở khoá và reset 2FA cùng lúc', function () {
-    $admin = lockedOutOwner();
-
-    $this->artisan('staff:recover-owner', ['email' => 'chu@shop.test', '--unlock' => true, '--reset-2fa' => true])
-        ->assertSuccessful();
-
-    expect($admin->fresh()->isDeactivated())->toBeFalse()
-        ->and(AppAuthentication::make()->isEnabled($admin->fresh()))->toBeFalse()
-        ->and(SecurityLogEntry::pluck('event')->all())
-        ->toEqualCanonicalizing([SecurityEvent::StaffReactivated, SecurityEvent::TwoFactorReset]);
+    expect(fn () => $this->artisan('staff:recover-owner', ['email' => 'chu@shop.test', '--reset-2fa' => true]))
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('từ chối khôi phục cho nhân viên không mang Vai trò Quản trị', function () {
-    $seller = tap(User::factory()->withTwoFactor()->create([
+    $seller = tap(User::factory()->create([
         'email' => 'binh@shop.test',
         'deactivated_at' => now(),
     ]))->assignRole(Role::BanHang);
@@ -71,6 +49,19 @@ it('từ chối khôi phục cho nhân viên không mang Vai trò Quản trị',
         ->assertFailed();
 
     expect($seller->fresh()->isDeactivated())->toBeTrue()
+        ->and(SecurityLogEntry::count())->toBe(0);
+});
+
+it('không đoán khi nhiều nhân viên cùng email', function () {
+    $first = lockedOutOwner();
+    $second = lockedOutOwner();
+
+    $this->artisan('staff:recover-owner', ['email' => 'chu@shop.test', '--unlock' => true])
+        ->expectsOutputToContain('Có nhiều nhân viên cùng email này.')
+        ->assertFailed();
+
+    expect($first->fresh()->isDeactivated())->toBeTrue()
+        ->and($second->fresh()->isDeactivated())->toBeTrue()
         ->and(SecurityLogEntry::count())->toBe(0);
 });
 

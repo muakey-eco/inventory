@@ -8,28 +8,23 @@ use App\Inventory\Access\MissingRole;
 use App\Inventory\Access\Role;
 use App\Inventory\Staff\LastActiveOwner;
 use App\Inventory\Staff\StaffManager;
-use App\Inventory\Staff\StaffRules;
 use App\Models\User;
 use BackedEnum;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use UnitEnum;
 
 /**
- * Quản lý nhân viên trong panel. Adapter mỏng: mọi thao tác gọi StaffManager,
- * nơi kiểm tra Vai trò, chặn mất Quản trị cuối cùng và ghi Nhật ký bảo mật.
- * Không có thao tác sửa tự do hay xoá nhân viên.
+ * Danh sách nhân viên trong panel. Nhân viên, tên, email và Vai trò đều đến từ Authentik
+ * (ADR 0008), nên ở đây chỉ đọc; thao tác duy nhất là Khoá nhân viên và mở khoá. Adapter
+ * mỏng: mọi thao tác gọi StaffManager, nơi kiểm tra Vai trò, chặn khoá Quản trị đang hoạt
+ * động cuối cùng và ghi Nhật ký bảo mật. Không có thao tác xoá nhân viên.
  */
 class StaffResource extends Resource
 {
@@ -51,29 +46,6 @@ class StaffResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    public static function form(Schema $schema): Schema
-    {
-        return $schema->columns(1)->components([
-            TextInput::make('name')
-                ->label('Tên')
-                ->required()
-                ->maxLength(StaffRules::MAX_LENGTH),
-            TextInput::make('email')
-                ->label('Email')
-                ->email()
-                ->required()
-                ->maxLength(StaffRules::MAX_LENGTH)
-                ->unique(User::class, 'email'),
-            TextInput::make('password')
-                ->label('Mật khẩu ban đầu')
-                ->password()
-                ->revealable()
-                ->required()
-                ->rule(StaffRules::password()),
-            self::rolesField(),
-        ]);
-    }
-
     public static function table(Table $table): Table
     {
         return $table
@@ -89,11 +61,12 @@ class StaffResource extends Resource
                 TextColumn::make('roles.name')
                     ->label('Vai trò')
                     ->badge()
+                    // Bảng pivot không có thứ tự: xếp theo thứ tự khai báo Vai trò cho dễ dò.
+                    ->state(fn (User $record): array => array_map(
+                        fn (Role $role): string => $role->value,
+                        Role::inOrder($record->getRoleNames()->map(fn (string $name): Role => Role::from($name))),
+                    ))
                     ->formatStateUsing(fn (string $state): string => Role::from($state)->label()),
-                IconColumn::make('two_factor')
-                    ->label('2FA')
-                    ->boolean()
-                    ->state(fn (User $record): bool => AppAuthentication::make()->isEnabled($record)),
                 TextColumn::make('deactivated_at')
                     ->label('Trạng thái')
                     ->badge()
@@ -101,25 +74,6 @@ class StaffResource extends Resource
                     ->color(fn (User $record): string => $record->isDeactivated() ? 'danger' : 'success'),
             ])
             ->recordActions([
-                Action::make('changeRoles')
-                    ->label('Đổi Vai trò')
-                    ->icon(Heroicon::OutlinedUserGroup)
-                    ->fillForm(fn (User $record): array => ['roles' => $record->roles->pluck('name')->all()])
-                    ->schema([self::rolesField()])
-                    ->action(self::attempt(
-                        fn (StaffManager $staff, User $record, array $data) => $staff->changeRoles(self::actor(), $record, self::rolesFromForm($data['roles'])),
-                        'Đã đổi Vai trò.',
-                    )),
-                Action::make('resetTwoFactor')
-                    ->label('Reset 2FA')
-                    ->icon(Heroicon::OutlinedKey)
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalDescription('Nhân viên phải thiết lập lại 2FA ở lần vào panel kế tiếp.')
-                    ->action(self::attempt(
-                        fn (StaffManager $staff, User $record) => $staff->resetTwoFactor(self::actor(), $record),
-                        'Đã reset 2FA.',
-                    )),
                 Action::make('deactivate')
                     ->label('Khoá')
                     ->icon(Heroicon::OutlinedLockClosed)
@@ -148,25 +102,6 @@ class StaffResource extends Resource
         return [
             'index' => ManageStaff::route('/'),
         ];
-    }
-
-    public static function rolesField(): CheckboxList
-    {
-        return CheckboxList::make('roles')
-            ->label('Vai trò')
-            ->required()
-            ->options(collect(Role::cases())
-                ->mapWithKeys(fn (Role $role): array => [$role->value => $role->label()])
-                ->all());
-    }
-
-    /**
-     * @param  array<string>  $values
-     * @return list<Role>
-     */
-    public static function rolesFromForm(array $values): array
-    {
-        return array_values(array_map(fn (string $value): Role => Role::from($value), $values));
     }
 
     public static function actor(): User

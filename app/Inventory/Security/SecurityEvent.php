@@ -3,19 +3,18 @@
 namespace App\Inventory\Security;
 
 /**
- * Loại sự kiện ghi vào Nhật ký bảo mật.
+ * Loại sự kiện ghi vào Nhật ký bảo mật. Các sự kiện của đường mật khẩu + TOTP cũ đã xoá hẳn
+ * cùng đường đó (ADR 0008): kho chưa chạy production nên không có dòng cũ nào phải đọc lại.
  */
 enum SecurityEvent: string
 {
     case LoginSucceeded = 'login_succeeded';
-    case LoginFailed = 'login_failed';
-    case TwoFactorFailed = 'two_factor_failed';
-    case LoginThrottled = 'login_throttled';
-    case StaffCreated = 'staff_created';
+    case LoginRefused = 'login_refused';
+    case LoginWithoutMfa = 'login_without_mfa';
+    case StaffFirstSeen = 'staff_first_seen';
     case RolesChanged = 'roles_changed';
     case StaffDeactivated = 'staff_deactivated';
     case StaffReactivated = 'staff_reactivated';
-    case TwoFactorReset = 'two_factor_reset';
     case KeyFingerprintRegistered = 'key_fingerprint_registered';
     case KeyRotationStarted = 'key_rotation_started';
     case KeyRotationFinished = 'key_rotation_finished';
@@ -29,14 +28,12 @@ enum SecurityEvent: string
     {
         return match ($this) {
             self::LoginSucceeded => 'Đăng nhập thành công',
-            self::LoginFailed => 'Đăng nhập thất bại',
-            self::TwoFactorFailed => 'Nhập sai 2FA',
-            self::LoginThrottled => 'Bị chặn vì thử quá nhiều lần',
-            self::StaffCreated => 'Tạo nhân viên',
-            self::RolesChanged => 'Đổi Vai trò',
+            self::LoginRefused => 'Đăng nhập bị từ chối',
+            self::LoginWithoutMfa => 'Đăng nhập thiếu bằng chứng MFA',
+            self::StaffFirstSeen => 'Nhân viên xuất hiện lần đầu',
+            self::RolesChanged => 'Vai trò đổi theo Authentik',
             self::StaffDeactivated => 'Khoá nhân viên',
             self::StaffReactivated => 'Mở khoá nhân viên',
-            self::TwoFactorReset => 'Reset 2FA',
             self::KeyFingerprintRegistered => 'Đăng ký dấu vân tay khoá mã hoá',
             self::KeyRotationStarted => 'Bắt đầu xoay khoá mã hoá',
             self::KeyRotationFinished => 'Xoay xong khoá mã hoá',

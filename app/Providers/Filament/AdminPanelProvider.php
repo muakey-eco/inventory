@@ -2,11 +2,12 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Support\NavGroup;
+use App\Http\Controllers\Auth\AuthentikCallback;
+use App\Http\Controllers\Auth\DevSignIn;
+use App\Http\Controllers\Auth\RedirectToAuthentik;
 use App\Http\Middleware\Authenticate;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -18,6 +19,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -28,11 +30,20 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login(Login::class)
-            ->profile()
-            ->multiFactorAuthentication([
-                AppAuthentication::make()->recoverable(),
-            ], isRequired: true)
+            // Đăng nhập chỉ qua Authentik (ADR 0008): trang đăng nhập của panel chuyển thẳng
+            // sang đó, không có mật khẩu, 2FA hay trang hồ sơ trong kho.
+            ->login(RedirectToAuthentik::class)
+            ->routes(function (): void {
+                Route::get('/auth/callback', AuthentikCallback::class)->name('auth.authentik.callback');
+                Route::view('/auth/da-dang-xuat', 'auth.signed-out')->name('auth.signed-out');
+
+                // Route image production được cache lúc build với APP_ENV mặc định là production,
+                // nên đăng nhập giả không lọt vào đó; DevSignIn vẫn tự kiểm lại.
+                if (app()->isLocal()) {
+                    Route::get('/auth/dev', [DevSignIn::class, 'index'])->name('auth.dev');
+                    Route::post('/auth/dev/{user}', [DevSignIn::class, 'store'])->name('auth.dev.store');
+                }
+            })
             ->colors([
                 'primary' => Color::Amber,
             ])

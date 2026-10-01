@@ -69,7 +69,7 @@ beforeEach(function () {
 });
 
 it('cả ba vai trò vào được báo cáo Nhập/xuất; nhân viên không có vai trò thì không', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->withTwoFactor()->create() : staffMember($role));
+    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
 
     $this->get(MovementReportPage::getUrl())->assertStatus($sees ? 200 : 403);
 })->with([

@@ -98,7 +98,7 @@ function dashboardStats(string $widget): array
 }
 
 it('mỗi Vai trò thấy đúng widget của công việc mình làm, số ô không đổi theo người xem', function (?Role $role, array $visible) {
-    $this->actingAs($role === null ? User::factory()->withTwoFactor()->create() : staffMember($role));
+    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
 
     $this->get(Dashboard::getUrl())->assertOk();
 

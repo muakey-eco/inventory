@@ -2,17 +2,8 @@
 
 namespace App\Inventory\SignIn;
 
-use DomainException;
-use Firebase\JWT\JWK;
-use Firebase\JWT\JWT;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
-use UnexpectedValueException;
 
 /**
  * Hai nửa của luồng OIDC authorization code + PKCE với Authentik: {@see self::begin()} dựng URL
@@ -24,10 +15,7 @@ class AuthentikLogin
 {
     private const SESSION_KEY = 'authentik.pending';
 
-    /**
-     * Độ lệch đồng hồ chấp nhận giữa kho và Authentik khi kiểm iat/exp, tính bằng giây.
-     */
-    private const CLOCK_LEEWAY = 60;
+    public function __construct(private AuthentikProvider $provider) {}
 
     /**
      * @throws SignInRefused nếu không đọc được cấu hình của Authentik
@@ -40,9 +28,9 @@ class AuthentikLogin
             'verifier' => Str::random(64),
         ];
 
-        $url = $this->discovery()['authorization_endpoint'].'?'.http_build_query([
+        $url = $this->refusing(fn () => $this->provider->discovery())['authorization_endpoint'].'?'.http_build_query([
             'response_type' => 'code',
-            'client_id' => $this->clientId(),
+            'client_id' => $this->provider->clientId(),
             'redirect_uri' => self::redirectUri(),
             // `kho` là scope mapping riêng trả claim `kho_groups` (xem README).
             'scope' => 'openid profile email kho',
@@ -97,14 +85,7 @@ class AuthentikLogin
      */
     private function exchange(string $code, string $verifier): string
     {
-        $token = $this->fetch(fn () => Http::asForm()
-            ->withBasicAuth($this->clientId(), (string) config('services.authentik.client_secret'))
-            ->post($this->discovery()['token_endpoint'], [
-                'grant_type' => 'authorization_code',
-                'code' => $code,
-                'redirect_uri' => self::redirectUri(),
-                'code_verifier' => $verifier,
-            ]));
+        $token = $this->refusing(fn () => $this->provider->exchange($code, $verifier, self::redirectUri()));
 
         if (! is_string($token['id_token'] ?? null)) {
             throw new SignInRefused(Refusal::InvalidToken, details: ['error' => 'missing_id_token']);
@@ -114,32 +95,13 @@ class AuthentikLogin
     }
 
     /**
-     * Chữ ký theo JWKS của Authentik, rồi iss, aud, thời hạn và nonce.
+     * Chữ ký, iss, aud và thời hạn qua {@see AuthentikProvider}, rồi nonce và sub.
      *
      * @throws SignInRefused
      */
     private function verify(string $idToken, string $nonce): AuthentikIdentity
     {
-        $discovery = $this->discovery();
-        $keys = $this->fetch(fn () => Http::get($discovery['jwks_uri']));
-
-        try {
-            JWT::$leeway = self::CLOCK_LEEWAY;
-            $claims = (array) JWT::decode($idToken, JWK::parseKeySet($keys, 'RS256'));
-        } catch (UnexpectedValueException|DomainException|InvalidArgumentException $exception) {
-            throw new SignInRefused(Refusal::InvalidToken, details: ['error' => class_basename($exception)]);
-        }
-
-        // php-jwt chỉ kiểm exp/iat khi token có mang; id_token thì bắt buộc phải có.
-        if (! is_int($claims['exp'] ?? null) || ! is_int($claims['iat'] ?? null)) {
-            throw new SignInRefused(Refusal::InvalidToken, details: ['error' => 'missing_exp_or_iat']);
-        }
-
-        $audience = (array) ($claims['aud'] ?? []);
-
-        if (($claims['iss'] ?? null) !== $discovery['issuer'] || ! in_array($this->clientId(), $audience, true)) {
-            throw new SignInRefused(Refusal::InvalidToken, details: ['error' => 'wrong_issuer_or_audience']);
-        }
+        $claims = $this->refusing(fn () => $this->provider->claims($idToken));
 
         if (! is_string($claims['nonce'] ?? null) || ! hash_equals($nonce, $claims['nonce'])) {
             throw new SignInRefused(Refusal::InvalidNonce);
@@ -153,6 +115,7 @@ class AuthentikLogin
 
         $email = $claims['email'] ?? null;
         $name = $claims['name'] ?? $claims['preferred_username'] ?? null;
+        $sid = $claims['sid'] ?? null;
 
         return new AuthentikIdentity(
             uuid: $uuid,
@@ -160,67 +123,27 @@ class AuthentikLogin
             email: is_string($email) && $email !== '' ? $email : null,
             groups: self::strings($claims['kho_groups'] ?? []),
             amr: self::strings($claims['amr'] ?? []),
+            sid: is_string($sid) && $sid !== '' ? $sid : null,
         );
     }
 
     /**
-     * @return array{issuer: string, authorization_endpoint: string, token_endpoint: string, jwks_uri: string}
+     * @template T
+     *
+     * @param  callable(): T  $call
+     * @return T
      *
      * @throws SignInRefused
      */
-    private function discovery(): array
-    {
-        $issuer = (string) config('services.authentik.issuer');
-
-        return once(function () use ($issuer): array {
-            $discovery = $this->fetch(fn () => Http::get(Str::finish($issuer, '/').'.well-known/openid-configuration'));
-
-            foreach (['issuer', 'authorization_endpoint', 'token_endpoint', 'jwks_uri'] as $key) {
-                if (! is_string($discovery[$key] ?? null)) {
-                    throw new SignInRefused(Refusal::ProviderError, details: ['error' => "discovery_missing_{$key}"]);
-                }
-            }
-
-            // Discovery phải nói đúng issuer đã cấu hình, để iss của id_token so với chính nó.
-            if (rtrim($discovery['issuer'], '/') !== rtrim($issuer, '/')) {
-                throw new SignInRefused(Refusal::ProviderError, details: ['error' => 'discovery_issuer_mismatch']);
-            }
-
-            /** @var array{issuer: string, authorization_endpoint: string, token_endpoint: string, jwks_uri: string} $discovery */
-            return $discovery;
-        });
-    }
-
-    /**
-     * @param  callable(): Response  $request
-     * @return array<string, mixed>
-     *
-     * @throws SignInRefused
-     */
-    private function fetch(callable $request): array
+    private function refusing(callable $call): mixed
     {
         try {
-            $response = $request()->throw();
-        } catch (ConnectionException|RequestException $exception) {
-            $error = $exception instanceof RequestException ? $exception->response->json('error') : null;
-
-            throw new SignInRefused(Refusal::ProviderError, details: [
-                'error' => is_string($error) ? Str::limit($error, 100) : class_basename($exception),
-            ]);
+            return $call();
+        } catch (AuthentikProviderError $exception) {
+            throw new SignInRefused(Refusal::ProviderError, details: ['error' => $exception->getMessage()]);
+        } catch (InvalidAuthentikToken $exception) {
+            throw new SignInRefused(Refusal::InvalidToken, details: ['error' => $exception->getMessage()]);
         }
-
-        $json = $response->json();
-
-        if (! is_array($json)) {
-            throw new SignInRefused(Refusal::ProviderError, details: ['error' => 'not_json']);
-        }
-
-        return $json;
-    }
-
-    private function clientId(): string
-    {
-        return (string) config('services.authentik.client_id');
     }
 
     /**

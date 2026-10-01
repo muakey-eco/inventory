@@ -8,96 +8,13 @@ use App\Models\SecurityLogEntry;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
-use Firebase\JWT\JWT;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Testing\TestResponse;
-
-const AUTHENTIK_ISSUER = 'https://auth.shop.test/application/o/kho/';
-const AUTHENTIK_UUID = '6f1c2a8e-4b1d-4c5e-9a3f-2d7b8e0c1a55';
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
-
-    config([
-        'services.authentik.issuer' => AUTHENTIK_ISSUER,
-        'services.authentik.client_id' => 'kho-client',
-        'services.authentik.client_secret' => 'kho-secret',
-    ]);
-
-    $this->idTokenClaims = [];
-    $this->idTokenKey = authentikKeyPair()['private'];
-
-    Http::fake([
-        AUTHENTIK_ISSUER.'.well-known/openid-configuration' => Http::response([
-            'issuer' => AUTHENTIK_ISSUER,
-            'authorization_endpoint' => 'https://auth.shop.test/application/o/authorize/',
-            'token_endpoint' => 'https://auth.shop.test/application/o/token/',
-            'jwks_uri' => AUTHENTIK_ISSUER.'jwks/',
-        ]),
-        AUTHENTIK_ISSUER.'jwks/' => Http::response(['keys' => [authentikKeyPair()['jwk']]]),
-        'https://auth.shop.test/application/o/token/' => fn () => Http::response([
-            'access_token' => 'access',
-            'token_type' => 'Bearer',
-            'id_token' => JWT::encode(test()->idTokenClaims, test()->idTokenKey, 'RS256', 'kho-key'),
-        ]),
-    ]);
+    fakeAuthentik();
 });
-
-/**
- * Một cặp khoá RSA cho cả lượt chạy: sinh khoá chậm, mà test chỉ cần nó khác khoá của kẻ giả mạo.
- *
- * @return array{private: string, jwk: array<string, string>}
- */
-function authentikKeyPair(bool $forger = false): array
-{
-    static $pairs = [];
-
-    return $pairs[$forger] ??= (function (): array {
-        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
-        openssl_pkey_export($key, $private);
-        $rsa = openssl_pkey_get_details($key)['rsa'];
-        $base64url = fn (string $bytes): string => rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
-
-        return [
-            'private' => $private,
-            'jwk' => ['kty' => 'RSA', 'alg' => 'RS256', 'use' => 'sig', 'kid' => 'kho-key', 'n' => $base64url($rsa['n']), 'e' => $base64url($rsa['e'])],
-        ];
-    })();
-}
-
-/**
- * Đi trọn một vòng đăng nhập: vào trang đăng nhập của panel, "đăng nhập ở Authentik", rồi quay
- * về callback. `$claims` đè lên id_token hợp lệ mặc định; `$callback` đè lên query của callback.
- *
- * @param  array<string, mixed>  $claims
- * @param  array<string, string>  $callback
- */
-function signInViaAuthentik(array $claims = [], array $callback = []): TestResponse
-{
-    $location = test()->get(Filament::getLoginUrl())->headers->get('Location');
-    parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
-
-    test()->idTokenClaims = [
-        'iss' => AUTHENTIK_ISSUER,
-        'aud' => 'kho-client',
-        'sub' => AUTHENTIK_UUID,
-        'nonce' => $query['nonce'],
-        'iat' => time(),
-        'exp' => time() + 300,
-        'name' => 'An Nguyễn',
-        'email' => 'an@shop.test',
-        'kho_groups' => ['kho-ban-hang'],
-        'amr' => ['pwd', 'mfa'],
-        ...$claims,
-    ];
-
-    return test()->get(route('filament.admin.auth.authentik.callback', [
-        'code' => 'authorization-code',
-        'state' => $query['state'],
-        ...$callback,
-    ]));
-}
 
 it('trang đăng nhập của panel chuyển thẳng sang Authentik kèm state, nonce và PKCE', function () {
     $location = $this->get(Filament::getLoginUrl())->assertRedirect()->headers->get('Location');

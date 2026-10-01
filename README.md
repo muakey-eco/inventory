@@ -104,6 +104,17 @@ Rồi điền vào `app.env`:
 AUTHENTIK_API_TOKEN=
 ```
 
+### Back-channel logout từ Authentik
+
+Đối soát để lại độ trễ tới một phút. Authentik (từ 2025.8, tính năng còn gắn nhãn **Preview**) gửi thêm một `logout_token` có chữ ký sang kho khi phiên Authentik kết thúc: nhân viên đăng xuất, Quản trị Authentik xoá phiên, người dùng bị tắt, hay phiên hết hạn. Kho xác minh chữ ký qua JWKS cùng `iss`, `aud`, `iat`, `events`, chống phát lại theo `jti`, rồi huỷ phiên kho ở request kế tiếp: đúng phiên mở từ phiên Authentik đó nếu token có `sid`, mọi phiên của nhân viên nếu chỉ có `sub`. Endpoint chỉ huỷ phiên, không bao giờ cấp hay đổi quyền; quyền vẫn đổi qua đăng nhập và đối soát, nên Authentik không gửi được thì đối soát vẫn là lưới an toàn. Mỗi logout_token hợp lệ có `sub` của một nhân viên kho ghi Nhật ký bảo mật "Authentik huỷ phiên kho" (`scope`: `session` hoặc `all_sessions`), kể cả khi phiên kho đó đã tự hết; token bị từ chối chỉ ghi log ứng dụng.
+
+Cấu hình trên **Provider** ở mục Đăng nhập (Advanced protocol settings):
+
+- **Logout URI**: `https://<APP_URL>/auth/authentik/backchannel-logout` (không có `/admin`). Authentik gọi từ server của nó, nên URL này phải tới được từ máy chạy Authentik.
+- **Logout Method**: **Back-channel**.
+
+Không cần thêm biến môi trường: kho dùng lại `AUTHENTIK_ISSUER` và `AUTHENTIK_CLIENT_ID`.
+
 ### Deploy
 
 Trên máy dev, từ một commit đã sạch (script từ chối chạy nếu cây làm việc còn thay đổi chưa commit):

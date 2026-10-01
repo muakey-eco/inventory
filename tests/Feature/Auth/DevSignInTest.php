@@ -1,6 +1,7 @@
 <?php
 
 use App\Inventory\Access\Role;
+use App\Inventory\Staff\AuthentikRevocation;
 use App\Models\User;
 use Database\Seeders\DevStaffSeeder;
 use Database\Seeders\RoleSeeder;
@@ -76,7 +77,7 @@ it('chạy lại seeder trả quyền cho nhân viên dev mà đối soát với
     // uuid giả không có trên Authentik của profile `sso`, nên đối soát thu quyền cả ba người.
     app(RoleSeeder::class)->run();
     app(DevStaffSeeder::class)->run();
-    User::query()->update(['authentik_revoked_at' => now(), 'authentik_revoked_reason' => 'deleted']);
+    User::query()->update(['authentik_revoked_at' => now(), 'authentik_revoked_reason' => AuthentikRevocation::NotFound]);
 
     app(DevStaffSeeder::class)->run();
 

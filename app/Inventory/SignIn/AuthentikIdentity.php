@@ -36,9 +36,20 @@ final readonly class AuthentikIdentity
      */
     public function roles(): array
     {
+        return self::rolesFor($this->groups);
+    }
+
+    /**
+     * Vai trò ứng với các group cho trước, dùng chung cho đăng nhập và đối soát.
+     *
+     * @param  list<string>  $groups
+     * @return list<Role>
+     */
+    public static function rolesFor(array $groups): array
+    {
         return Role::inOrder(array_map(
             fn (string $group): Role => self::GROUPS[$group],
-            array_filter($this->groups, fn (string $group): bool => isset(self::GROUPS[$group])),
+            array_filter($groups, fn (string $group): bool => isset(self::GROUPS[$group])),
         ));
     }
 

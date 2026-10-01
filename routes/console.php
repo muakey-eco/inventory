@@ -17,3 +17,7 @@ Schedule::command('inventory:defect-reports:purge')->hourly();
 // Phiếu xuất Đang giữ quá hạn Giữ hàng: nhả Slot về Còn hàng, phiếu sang Hết hạn giữ. Mỗi phút,
 // vì hạn Giữ hàng tính bằng phút; giữ lâu hơn cần thì hàng nằm chết trong kho.
 Schedule::command('inventory:dispatches:release-holds')->everyMinute();
+
+// Đối soát nhân viên với Authentik (ADR 0008): người bị tắt hoặc gỡ khỏi group `kho-*` mất quyền
+// trong vòng một phút, kể cả phiên đang mở.
+Schedule::command('inventory:staff:sync')->everyMinute()->withoutOverlapping();

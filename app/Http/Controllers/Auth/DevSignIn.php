@@ -20,14 +20,14 @@ class DevSignIn
         abort_unless(app()->isLocal(), 404);
 
         return view('auth.dev-sign-in', [
-            'staff' => User::with('roles')->whereNull('deactivated_at')->orderBy('name')->get(),
+            'staff' => User::with('roles')->whereNull('deactivated_at')->whereNull('authentik_revoked_at')->orderBy('name')->get(),
         ]);
     }
 
     public function store(Request $request, User $user): RedirectResponse
     {
         abort_unless(app()->isLocal(), 404);
-        abort_if($user->isDeactivated(), 403);
+        abort_if($user->isLockedOut(), 403);
 
         Filament::auth()->login($user);
         $request->session()->regenerate();

@@ -5,18 +5,23 @@ namespace App\Inventory\SignIn;
 use App\Inventory\Access\Role;
 use App\Inventory\Security\SecurityEvent;
 use App\Inventory\Security\SecurityLog;
+use App\Inventory\Staff\AuthentikRevocation;
+use App\Inventory\Staff\StaffMirror;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Nhận một danh tính Authentik đã xác minh và quyết định ai được vào kho (ADR 0008). Nhân
- * viên khớp theo `sub`, chưa có thì tạo mới; mỗi lần đăng nhập đồng bộ tên, email và bản sao
- * Vai trò. Authentik làm chủ Vai trò nên ở đây không chặn mất Quản trị cuối cùng; Khoá nhân
- * viên thì là của kho, và đăng nhập lại ở Authentik không mở khoá.
+ * viên khớp theo `sub`, chưa có thì tạo mới; mỗi lần đăng nhập đồng bộ tên, email, bản sao
+ * Vai trò và quyền vào kho qua {@see StaffMirror}. Authentik làm chủ Vai trò nên ở đây không
+ * chặn mất Quản trị cuối cùng; Khoá nhân viên thì là của kho, và đăng nhập lại ở Authentik
+ * không mở khoá.
  */
 class StaffSignIn
 {
-    public function __construct(private SecurityLog $log) {}
+    private const VIA = 'authentik';
+
+    public function __construct(private SecurityLog $log, private StaffMirror $mirror) {}
 
     /**
      * @throws SignInRefused
@@ -35,11 +40,20 @@ class StaffSignIn
             throw new SignInRefused(Refusal::NoRole, email: $identity->email, details: ['authentik_uuid' => $identity->uuid]);
         }
 
-        // Đồng bộ cả khi sắp từ chối vì hết Vai trò: bản sao trong kho phải theo Authentik,
-        // để phiên đang mở của người vừa bị thu quyền cũng mất quyền theo.
-        $staff = DB::transaction(fn (): User => $staff === null
-            ? $this->firstSeen($identity, $roles)
-            : $this->sync($staff, $identity, $roles));
+        // Đồng bộ cả khi sắp từ chối vì hết Vai trò: bản sao trong kho phải theo Authentik.
+        $staff = DB::transaction(function () use ($staff, $identity, $roles): User {
+            if ($staff === null) {
+                return $this->firstSeen($identity, $roles);
+            }
+
+            $this->mirror->sync($staff, $identity->name, $identity->email, $roles, self::VIA);
+
+            // Authentik vừa xác thực được họ nên người dùng còn active; còn quyền hay không chỉ
+            // tuỳ group. Phiên kho đang mở ở máy khác cũng theo đó mà mất hoặc có lại quyền.
+            $this->mirror->grantOrRevoke($staff, $roles === [] ? AuthentikRevocation::NoRole : null, self::VIA);
+
+            return $staff;
+        });
 
         if ($roles === []) {
             throw new SignInRefused(Refusal::NoRole, $staff);
@@ -65,44 +79,10 @@ class StaffSignIn
         $staff->syncRoles($roles);
 
         $this->log->record(SecurityEvent::StaffFirstSeen, $staff, details: [
-            'roles' => self::roleNames($roles),
-            'via' => 'authentik',
+            'roles' => StaffMirror::roleNames($roles),
+            'via' => self::VIA,
         ]);
 
         return $staff;
-    }
-
-    /**
-     * @param  list<Role>  $roles
-     */
-    private function sync(User $staff, AuthentikIdentity $identity, array $roles): User
-    {
-        $staff->fill(['name' => $identity->name, 'email' => $identity->email])->save();
-
-        $from = self::roleNames($staff->getRoleNames()->map(fn (string $name): Role => Role::from($name))->all());
-        $to = self::roleNames($roles);
-
-        if ($from !== $to) {
-            $staff->syncRoles($roles);
-
-            $this->log->record(SecurityEvent::RolesChanged, $staff, details: [
-                'from' => $from,
-                'to' => $to,
-                'via' => 'authentik',
-            ]);
-        }
-
-        return $staff;
-    }
-
-    /**
-     * Tên Vai trò theo thứ tự khai báo, để so sánh và ghi nhật ký không phụ thuộc thứ tự group.
-     *
-     * @param  array<Role>  $roles
-     * @return list<string>
-     */
-    private static function roleNames(array $roles): array
-    {
-        return array_map(fn (Role $role): string => $role->value, Role::inOrder($roles));
     }
 }

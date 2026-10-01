@@ -2,6 +2,7 @@
 
 use App\Inventory\Access\Role;
 use App\Inventory\Security\SecurityEvent;
+use App\Inventory\Staff\AuthentikRevocation;
 use App\Inventory\Staff\StaffManager;
 use App\Models\SecurityLogEntry;
 use App\Models\User;
@@ -299,10 +300,22 @@ it('nhân viên cũ mất hết group kho-* thì mất Vai trò ở kho và bị
     signInViaAuthentik(['kho_groups' => []])->assertForbidden();
 
     expect($staff->fresh()->roles)->toBeEmpty()
+        ->and($staff->fresh()->authentik_revoked_reason)->toBe(AuthentikRevocation::NoRole)
         ->and(SecurityLogEntry::where('event', SecurityEvent::RolesChanged)->sole()->details)
         ->toBe(['to' => [], 'via' => 'authentik', 'from' => [Role::BanHang->value]])
         ->and(SecurityLogEntry::where('event', SecurityEvent::LoginRefused)->sole())
         ->user_id->toBe($staff->id);
+});
+
+it('đăng nhập lại khi đã có group kho-* thì có lại quyền ngay, không chờ đối soát', function () {
+    $staff = tap(User::factory()->create(['authentik_uuid' => AUTHENTIK_UUID]))->assignRole(Role::BanHang);
+    $staff->forceFill(['authentik_revoked_at' => now(), 'authentik_revoked_reason' => AuthentikRevocation::Inactive])->save();
+
+    signInViaAuthentik()->assertRedirect(Filament::getUrl());
+
+    expect($staff->fresh()->isRevokedByAuthentik())->toBeFalse()
+        ->and(SecurityLogEntry::where('event', SecurityEvent::AuthentikAccessRestored)->sole()->details)
+        ->toBe(['via' => 'authentik']);
 });
 
 it('đăng xuất huỷ phiên kho rồi dừng ở trang tĩnh, không đụng Authentik', function () {

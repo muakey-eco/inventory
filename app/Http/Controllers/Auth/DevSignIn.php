@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Inventory\SignIn\AuthentikSessions;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
@@ -24,13 +25,14 @@ class DevSignIn
         ]);
     }
 
-    public function store(Request $request, User $user): RedirectResponse
+    public function store(Request $request, User $user, AuthentikSessions $sessions): RedirectResponse
     {
         abort_unless(app()->isLocal(), 404);
         abort_if($user->isLockedOut(), 403);
 
         Filament::auth()->login($user);
         $request->session()->regenerate();
+        $sessions->start($request, null);
 
         return redirect()->intended(Filament::getUrl());
     }

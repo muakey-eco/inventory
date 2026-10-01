@@ -13,5 +13,5 @@ Kho không còn tự quản đăng nhập hay phân quyền. Nhân viên đăng 
 
 - Kho không chặn được việc mất Quản trị cuối cùng. Bất biến này chuyển sang người quản Authentik.
 - **Nhật ký bảo mật** chỉ ghi được rằng kho *nhận thấy* Vai trò đổi. Ai bấm thay đổi thì phải tra trong nhật ký của Authentik.
-- Thu quyền bên Authentik có độ trễ tới một chu kỳ đối soát. Cần chặn ngay thì Quản trị dùng **Khoá nhân viên** trong kho; đối soát không bao giờ mở khoá do Quản trị đặt.
+- Thu quyền bên Authentik có độ trễ tới một chu kỳ đối soát. Phiên đang mở thì back-channel logout của Authentik (issue #108) huỷ ngay khi người dùng bị tắt hay bị xoá phiên, nhưng endpoint đó chỉ huỷ phiên, không đổi quyền, và tính năng còn Preview bên Authentik nên đối soát vẫn là đường chính. Cần chặn ngay thì Quản trị dùng **Khoá nhân viên** trong kho; đối soát không bao giờ mở khoá do Quản trị đặt.
 - Authentik sập thì không ai đăng nhập được vào kho.

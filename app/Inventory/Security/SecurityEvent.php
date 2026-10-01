@@ -17,6 +17,7 @@ enum SecurityEvent: string
     case StaffReactivated = 'staff_reactivated';
     case AuthentikAccessRevoked = 'authentik_access_revoked';
     case AuthentikAccessRestored = 'authentik_access_restored';
+    case AuthentikSessionEnded = 'authentik_session_ended';
     case KeyFingerprintRegistered = 'key_fingerprint_registered';
     case KeyRotationStarted = 'key_rotation_started';
     case KeyRotationFinished = 'key_rotation_finished';
@@ -38,6 +39,7 @@ enum SecurityEvent: string
             self::StaffReactivated => 'Mở khoá nhân viên',
             self::AuthentikAccessRevoked => 'Mất quyền theo Authentik',
             self::AuthentikAccessRestored => 'Có lại quyền theo Authentik',
+            self::AuthentikSessionEnded => 'Authentik huỷ phiên kho',
             self::KeyFingerprintRegistered => 'Đăng ký dấu vân tay khoá mã hoá',
             self::KeyRotationStarted => 'Bắt đầu xoay khoá mã hoá',
             self::KeyRotationFinished => 'Xoay xong khoá mã hoá',

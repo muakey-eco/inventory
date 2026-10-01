@@ -22,6 +22,7 @@ final readonly class AuthentikIdentity
      * @param  string  $uuid  `sub` của id_token, tức `uuid` của người dùng bên Authentik
      * @param  list<string>  $groups  claim `kho_groups`
      * @param  list<string>  $amr  cách Authentik đã xác thực người dùng, ví dụ `pwd`, `mfa`
+     * @param  ?string  $sid  phiên Authentik đã cấp id_token, để back-channel logout huỷ đúng phiên kho
      */
     public function __construct(
         public string $uuid,
@@ -29,6 +30,7 @@ final readonly class AuthentikIdentity
         public ?string $email,
         public array $groups,
         public array $amr,
+        public ?string $sid = null,
     ) {}
 
     /**

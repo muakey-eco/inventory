@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Inventory\SignIn\AuthentikLogin;
+use App\Inventory\SignIn\AuthentikSessions;
 use App\Inventory\SignIn\SignInRefused;
 use App\Inventory\SignIn\StaffSignIn;
 use Filament\Facades\Filament;
@@ -18,16 +19,18 @@ class AuthentikCallback
 {
     use RefusesSignIn;
 
-    public function __invoke(Request $request, AuthentikLogin $authentik, StaffSignIn $signIn): RedirectResponse|Response
+    public function __invoke(Request $request, AuthentikLogin $authentik, StaffSignIn $signIn, AuthentikSessions $sessions): RedirectResponse|Response
     {
         try {
-            $staff = $signIn->signIn($authentik->complete($request));
+            $identity = $authentik->complete($request);
+            $staff = $signIn->signIn($identity);
         } catch (SignInRefused $refused) {
             return $this->refuse($refused);
         }
 
         Filament::auth()->login($staff);
         $request->session()->regenerate();
+        $sessions->start($request, $identity->sid);
 
         return redirect()->intended(Filament::getUrl());
     }

@@ -1,0 +1,241 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+#
+# Authentik cho máy dev (profile `sso` trong compose.yaml), dựng đúng cấu hình README mô tả cho
+# production: Application "Kho", scope mapping `kho`, ba group Vai trò, flow bắt MFA, service
+# account chỉ đọc cho đối soát. Mọi bí mật dưới đây là giá trị dev công khai, khớp `.env.example`.
+# Đừng dùng file này cho production (ADR 0008).
+#
+# Worker áp blueprint lúc khởi động và mỗi khi file đổi. Trạng thái `present` nên sửa ở đây là
+# Authentik theo, kể cả mật khẩu user mẫu bị đặt lại mỗi lần áp.
+version: 1
+metadata:
+  name: Kho - dev
+context:
+  kho_url: !Env [KHO_URL, "http://localhost:8080"]
+  password: kho-dev-mat-khau
+entries:
+  # Flow và stage mặc định mà các mục dưới tham chiếu phải có trước, kể cả ở lần khởi động đầu.
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Provider authorization flow (implicit consent)
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Provider invalidation flow
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - TOTP MFA setup flow
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Static MFA setup flow
+      required: true
+
+  # --- Flow đăng nhập bắt MFA -------------------------------------------------------------------
+  # Người chưa có thiết bị bị bắt cài ngay (TOTP hoặc mã tĩnh), không có đường "skip".
+  - model: authentik_flows.flow
+    id: flow
+    identifiers:
+      slug: kho-authentication
+    attrs:
+      name: Kho - đăng nhập
+      title: Đăng nhập Kho
+      designation: authentication
+      authentication: none
+  - model: authentik_stages_identification.identificationstage
+    id: identification
+    identifiers:
+      name: kho-identification
+    attrs:
+      user_fields:
+        - username
+        - email
+  - model: authentik_stages_password.passwordstage
+    id: password
+    identifiers:
+      name: kho-password
+    attrs:
+      backends:
+        - authentik.core.auth.InbuiltBackend
+  - model: authentik_stages_authenticator_validate.authenticatorvalidatestage
+    id: mfa
+    identifiers:
+      name: kho-mfa
+    attrs:
+      device_classes:
+        - totp
+        - static
+      not_configured_action: configure
+      configuration_stages:
+        - !Find [authentik_stages_authenticator_totp.authenticatortotpstage, [name, default-authenticator-totp-setup]]
+        - !Find [authentik_stages_authenticator_static.authenticatorstaticstage, [name, default-authenticator-static-setup]]
+  - model: authentik_stages_user_login.userloginstage
+    id: login
+    identifiers:
+      name: kho-login
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf identification
+      order: 10
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf password
+      order: 20
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf mfa
+      order: 30
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf login
+      order: 100
+
+  # --- Group Vai trò ----------------------------------------------------------------------------
+  - model: authentik_core.group
+    id: kho-quan-tri
+    identifiers:
+      name: kho-quan-tri
+  - model: authentik_core.group
+    id: kho-nhap-kho
+    identifiers:
+      name: kho-nhap-kho
+  - model: authentik_core.group
+    id: kho-ban-hang
+    identifiers:
+      name: kho-ban-hang
+
+  # --- Scope mapping, provider, application -----------------------------------------------------
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-kho
+    identifiers:
+      name: Kho - kho_groups
+    attrs:
+      scope_name: kho
+      description: Vai trò trong Kho
+      expression: |
+        return {"kho_groups": [group.name for group in request.user.groups.filter(name__startswith="kho-")]}
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider
+    identifiers:
+      name: Kho
+    attrs:
+      client_type: confidential
+      client_id: kho-dev
+      client_secret: kho-dev-client-secret-chi-dung-tren-may-dev
+      grant_types:
+        - authorization_code
+      redirect_uris:
+        - matching_mode: strict
+          url: !Format ["%s/admin/auth/callback", !Context kho_url]
+          redirect_uri_type: authorization
+      sub_mode: user_uuid
+      include_claims_in_id_token: true
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      authentication_flow: !KeyOf flow
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      # Worker gọi kho qua mạng compose (`app:8000`), không qua APP_URL.
+      logout_uri: http://app:8000/auth/authentik/backchannel-logout
+      logout_method: backchannel
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !KeyOf scope-kho
+  - model: authentik_core.application
+    id: application
+    identifiers:
+      slug: kho
+    attrs:
+      name: Kho
+      provider: !KeyOf provider
+      policy_engine_mode: any
+  # Chỉ thành viên một group `kho-*` vào được Application.
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf application
+      group: !KeyOf kho-quan-tri
+      order: 10
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf application
+      group: !KeyOf kho-nhap-kho
+      order: 20
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf application
+      group: !KeyOf kho-ban-hang
+      order: 30
+
+  # --- User mẫu: mỗi Vai trò một người, cộng một người ngoài mọi group `kho-*` -------------------
+  - model: authentik_core.user
+    identifiers:
+      username: quan-tri
+    attrs:
+      name: Quản trị Mẫu
+      email: quan-tri@kho.test
+      password: !Context password
+      groups:
+        - !KeyOf kho-quan-tri
+  - model: authentik_core.user
+    identifiers:
+      username: nhap-kho
+    attrs:
+      name: Nhập kho Mẫu
+      email: nhap-kho@kho.test
+      password: !Context password
+      groups:
+        - !KeyOf kho-nhap-kho
+  - model: authentik_core.user
+    identifiers:
+      username: ban-hang
+    attrs:
+      name: Bán hàng Mẫu
+      email: ban-hang@kho.test
+      password: !Context password
+      groups:
+        - !KeyOf kho-ban-hang
+  - model: authentik_core.user
+    identifiers:
+      username: khach
+    attrs:
+      name: Khách Không Vai trò
+      email: khach@kho.test
+      password: !Context password
+      groups: []
+
+  # --- Service account chỉ đọc cho đối soát -----------------------------------------------------
+  - model: authentik_rbac.role
+    id: sync-role
+    identifiers:
+      name: kho-sync-chi-doc
+    attrs:
+      permissions:
+        - authentik_core.view_user
+        - authentik_core.view_group
+  - model: authentik_core.user
+    id: sync-user
+    identifiers:
+      username: kho-sync
+    attrs:
+      name: Kho - đối soát
+      type: service_account
+      roles:
+        - !KeyOf sync-role
+  - model: authentik_core.token
+    identifiers:
+      identifier: kho-sync-token
+    attrs:
+      user: !KeyOf sync-user
+      intent: api
+      expiring: false
+      key: kho-dev-sync-token-chi-dung-tren-may-dev

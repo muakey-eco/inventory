@@ -82,5 +82,75 @@ services:
             timeout: 5s
             retries: 30
 
+    # Authentik để thử đăng nhập OIDC, đối soát và back-channel logout end-to-end (README, mục
+    # "Authentik trên máy dev"). Ngốn tài nguyên nên chỉ chạy khi bật profile:
+    # `docker compose --profile sso up -d`. Không dùng cho production (ADR 0008).
+    authentik-postgres:
+        profiles: [sso]
+        image: postgres:16-alpine
+        environment:
+            POSTGRES_USER: authentik
+            POSTGRES_PASSWORD: authentik
+            POSTGRES_DB: authentik
+        volumes:
+            - authentik-postgres-data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U authentik"]
+            interval: 2s
+            timeout: 5s
+            retries: 30
+
+    authentik-server:
+        profiles: [sso]
+        image: ghcr.io/goauthentik/server:2026.8.3
+        command: server
+        environment: &authentik-environment
+            AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+            AUTHENTIK_POSTGRESQL__USER: authentik
+            AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+            AUTHENTIK_POSTGRESQL__NAME: authentik
+            AUTHENTIK_SECRET_KEY: kho-dev-authentik-secret-key-chi-dung-tren-may-dev
+            AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@kho.test
+            AUTHENTIK_BOOTSTRAP_PASSWORD: kho-dev-akadmin
+            AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+            AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+            AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+            # Cùng một cổng trong và ngoài container, để `authentik.test:9030` đúng ở cả hai phía.
+            # Không dùng 9000 mặc định của Authentik vì hay đụng project khác trên máy dev.
+            AUTHENTIK_LISTEN__HTTP: 0.0.0.0:9030
+            # Redirect URI của kho trong blueprint, phải khớp địa chỉ trình duyệt mở kho.
+            KHO_URL: ${APP_URL:-http://localhost:8080}
+        volumes:
+            - ./docker/authentik/blueprints:/blueprints/custom:ro
+        # Trình duyệt và container kho phải gọi Authentik bằng cùng một địa chỉ, vì issuer trong
+        # token lấy theo Host của request. `authentik.test` là tên đó: trong mạng compose nhờ
+        # alias này, trên máy dev nhờ một dòng /etc/hosts. Tên `*.localhost` không dùng được vì
+        # curl trong container ép mọi `*.localhost` về loopback của chính nó.
+        networks:
+            default:
+                aliases:
+                    - authentik.test
+        ports:
+            - "127.0.0.1:9030:9030"
+        shm_size: 512mb
+        depends_on:
+            authentik-postgres:
+                condition: service_healthy
+
+    # Worker áp blueprint và gửi back-channel logout sang `app`. Không mount docker.sock như
+    # compose mẫu của Authentik: kho không dùng outpost.
+    authentik-worker:
+        profiles: [sso]
+        image: ghcr.io/goauthentik/server:2026.8.3
+        command: worker
+        environment: *authentik-environment
+        volumes:
+            - ./docker/authentik/blueprints:/blueprints/custom:ro
+        shm_size: 512mb
+        depends_on:
+            authentik-postgres:
+                condition: service_healthy
+
 volumes:
     postgres-data:
+    authentik-postgres-data:

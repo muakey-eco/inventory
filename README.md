@@ -21,6 +21,47 @@ docker compose up -d
 
 Panel ở <http://localhost:8080/admin>. Nhân viên đăng nhập qua Authentik (xem [Đăng nhập qua Authentik](#đăng-nhập-qua-authentik)). Máy dev chưa có Authentik thì vào <http://localhost:8080/admin/auth/dev>: `migrate --seed` ở `APP_ENV=local` tạo sẵn một nhân viên cho mỗi Vai trò, chọn một người là vào thẳng. Route này chỉ tồn tại khi `APP_ENV=local`.
 
+### Authentik trên máy dev
+
+Route đăng nhập giả đủ cho việc hằng ngày. Muốn thử luồng thật (redirect, callback, `kho_groups`, `amr`, trang từ chối, đối soát, back-channel logout) trước khi deploy thì bật profile `sso`: Authentik 2026.8 (server, worker, Postgres riêng) dựng sẵn mọi thứ theo blueprint [`docker/authentik/blueprints/kho.yaml`](docker/authentik/blueprints/kho.yaml). Profile này không chạy mặc định vì Authentik ngốn tài nguyên, và không dùng cho production ([ADR 0008](docs/adr/0008-authentik-lam-chu-xac-thuc-va-vai-tro.md)).
+
+1. Trình duyệt và container kho phải gọi Authentik bằng cùng một địa chỉ, vì issuer trong token lấy theo địa chỉ đó. Thêm một dòng vào `/etc/hosts` của máy chạy trình duyệt (một lần):
+
+   ```bash
+   echo "127.0.0.1 authentik.test" | sudo tee -a /etc/hosts
+   ```
+
+   Không dùng được `*.localhost`: curl trong container ép mọi tên `*.localhost` về loopback của chính container. Trình duyệt ở máy khác (ví dụ qua Tailscale) thì trỏ `authentik.test` về IP máy dev, và mở thêm cổng 9030 trên IP đó trong `compose.override.yaml` như cổng 8080.
+
+2. Bật Authentik. Lần đầu mất chừng một phút để migrate và áp blueprint:
+
+   ```bash
+   docker compose --profile sso up -d
+   ```
+
+   Giao diện quản trị ở <http://authentik.test:9030/if/admin/>, đăng nhập `akadmin` / `kho-dev-akadmin`.
+
+3. Chuyển kho sang Authentik: bỏ comment bốn giá trị `AUTHENTIK_*` cho chế độ `sso` trong `.env.example` rồi chép sang `.env`. Không cần khởi động lại gì: app và scheduler đọc `.env` ở mỗi request và mỗi lần chạy lệnh. Từ đây `/admin/login` chuyển sang Authentik.
+
+User mẫu, mật khẩu chung `kho-dev-mat-khau`:
+
+| User | Group | Kết quả |
+|---|---|---|
+| `quan-tri` | `kho-quan-tri` | vào kho với Vai trò Quản trị |
+| `nhap-kho` | `kho-nhap-kho` | vào kho với Vai trò Nhập kho |
+| `ban-hang` | `kho-ban-hang` | vào kho với Vai trò Bán hàng |
+| `khach` | không có | Authentik từ chối ngay, không về tới kho |
+
+Flow đăng nhập bắt MFA: lần đầu mỗi user phải cài TOTP (quét QR bằng app authenticator) hoặc mã tĩnh. Lần đăng nhập ngay sau khi cài, Authentik chưa gắn `mfa` vào `amr` nên kho ghi Nhật ký bảo mật "Đăng nhập thiếu bằng chứng MFA"; từ lần sau thì không. Trang từ chối của chính kho thì thử bằng cách đặt **Khoá nhân viên** cho một user mẫu rồi đăng nhập lại. Back-channel logout thì thử bằng cách xoá phiên của user trong Authentik (Directory → Users → Sessions): Authentik gọi `http://app:8000/auth/authentik/backchannel-logout` qua mạng compose. Service account `kho-sync` (chỉ đọc) và token của nó cũng có sẵn, scheduler đối soát mỗi phút như production.
+
+Quay lại route đăng nhập giả: để trống lại bốn giá trị `AUTHENTIK_*`, rồi `docker compose --profile sso stop`. Lúc bật `sso`, đối soát đã thu quyền ba nhân viên giả của seeder (uuid của họ không có trên Authentik), nên chạy lại seeder để trả quyền:
+
+```bash
+docker compose exec app php artisan db:seed --class=DevStaffSeeder
+```
+
+Muốn Authentik về trạng thái trắng (xoá cả thiết bị MFA đã cài) thì `docker compose --profile sso down` rồi `docker volume rm inventory_authentik-postgres-data`. User mẫu khi đó mang uuid mới: kho coi họ là nhân viên mới ở lần đăng nhập kế, còn bản cũ bị đối soát đánh dấu không còn trên Authentik. Blueprint là trạng thái mong muốn: sửa file là worker tự áp lại, kể cả đặt lại mật khẩu user mẫu.
+
 Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev server ở cổng 5173, không cần cài Node trên máy. Mở app ở địa chỉ khác `localhost` (ví dụ qua Tailscale) thì đặt `VITE_ORIGIN` và `VITE_HMR_HOST` cho khớp.
 
 ## Triển khai production
@@ -64,8 +105,10 @@ Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò*
 2. **Scope mapping** (Customization → Property Mappings → Scope Mapping), scope name `kho`, expression:
 
    ```python
-   return {"kho_groups": [group.name for group in request.user.ak_groups.filter(name__startswith="kho-")]}
+   return {"kho_groups": [group.name for group in request.user.groups.filter(name__startswith="kho-")]}
    ```
+
+   Đừng dùng `request.user.ak_groups` trong tài liệu cũ: từ Authentik 2026.8 nó là proxy deprecated, mỗi lần gọi ghi một event cảnh báo, và sẽ bị bỏ.
 
    Claim phải tên `kho_groups`, không phải `groups`: scope `profile` mặc định đã trả `groups` gồm mọi group, và Authentik nối list khi trộn claim cùng tên nên bộ lọc mất tác dụng.
 3. **Provider** OAuth2/OpenID:

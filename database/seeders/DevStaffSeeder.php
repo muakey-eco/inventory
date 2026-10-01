@@ -9,6 +9,9 @@ use Illuminate\Database\Seeder;
 /**
  * Một nhân viên cho mỗi Vai trò, để đăng nhập dev (/admin/auth/dev) có người mà chọn khi máy
  * dev chưa có Authentik. `authentik_uuid` là giá trị giả cố định: chạy lại vẫn an toàn.
+ *
+ * Bật Authentik dev (profile `sso`) thì đối soát thu quyền cả ba người vì uuid giả không có bên
+ * đó. Chạy lại seeder là trả quyền, để quay về đăng nhập dev mà không phải dựng lại DB.
  */
 class DevStaffSeeder extends Seeder
 {
@@ -21,8 +24,14 @@ class DevStaffSeeder extends Seeder
     public function run(): void
     {
         foreach (self::STAFF as $uuid => [$name, $email, $role]) {
-            User::updateOrCreate(['authentik_uuid' => $uuid], ['name' => $name, 'email' => $email])
-                ->syncRoles([$role]);
+            $staff = User::firstOrNew(['authentik_uuid' => $uuid]);
+            $staff->forceFill([
+                'name' => $name,
+                'email' => $email,
+                'authentik_revoked_at' => null,
+                'authentik_revoked_reason' => null,
+            ])->save();
+            $staff->syncRoles([$role]);
         }
     }
 }

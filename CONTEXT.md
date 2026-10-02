@@ -198,7 +198,7 @@ Nhân viên không vào được kho vì người dùng của họ trên Authent
 _Avoid_: khoá, vô hiệu hoá (đó là **Khoá nhân viên**)
 
 **Người vận hành server** (Server operator):
-Người có quyền quản trị máy chủ chạy kho, đọc được mọi nội dung mà không đi qua **Nhật ký xem mã**. Không phải một **Vai trò** trong app. Chỉ chủ shop giữ lâu dài; người khác chỉ được cấp theo từng đợt và bị thu hồi khi xong việc.
+Người đọc được khoá mã hoá của kho ở bất kỳ chỗ nào nó nằm: quản trị cụm hoặc node chạy kho, người đọc được secret của kho trong cụm, hoặc người đọc được nơi lưu bí mật mà cụm lấy khoá về. Đọc được mọi nội dung mà không đi qua **Nhật ký xem mã**. Không phải một **Vai trò** trong app. Trong shop, chỉ chủ shop giữ lâu dài; người khác chỉ được cấp theo từng đợt và bị thu hồi khi xong việc. Người quản cụm và Infisical của tổ chức giữ quyền lâu dài, là đánh đổi có chủ ý.
 _Avoid_: admin (dễ nhầm với **Quản trị**)
 
 **Tạm dừng xuất kho** (Dispatch freeze):

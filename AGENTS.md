@@ -14,9 +14,10 @@ Single-context: một `CONTEXT.md` và `docs/adr/` ở gốc repo. See `docs/age
 
 ## Migration tương thích ngược một phiên bản
 
-Áp dụng từ khi production trên k3s chạy (trước đó kho chưa có dữ liệu thật, migration cứ viết thẳng). `app` chạy RollingUpdate, nên code của release **trước** chạy trên schema **mới** trong lúc deploy (ADR 0009). Mọi migration đi theo expand/contract:
+Áp dụng từ khi production trên k3s chạy; trước mốc đó migration viết thẳng. Migration chạy trong initContainer **trước** khi pod mới nhận traffic, và pod `app` của release trước vẫn phục vụ trên schema mới tới khi rolling xong (ADR 0009). Mọi migration đi theo expand/contract, mỗi bước là một release:
 
-- **Xoá hoặc đổi tên cột:** tách hai release. Release 1 thêm cột mới và ghi song song cả hai cột; release 2 chuyển đọc sang cột mới rồi xoá cột cũ. Ví dụ đổi `note` thành `remark`: release 1 thêm `remark`, ghi cả `note` lẫn `remark`, backfill; release 2 xoá `note`.
-- **Cột `NOT NULL` mới:** có default, hoặc đi ba bước: thêm nullable, backfill, siết `NOT NULL` ở release sau.
-- **Trigger chỉ-ghi-thêm và CHECK constraint:** nới trước, siết ở release sau, khi code cũ không còn ghi giá trị bị cấm. Nới ở cùng release là an toàn, như `2026_09_17_110000_allow_sale_price_on_recorded_lines.php` thêm `'recorded'` vào `dispatch_lines_sale_price_kind`.
-- **Tên bảng và class job:** giữ nguyên trong cùng release. Pod `app` cũ vẫn ghi vào tên bảng cũ và dispatch job theo tên class cũ, worker mới phải chạy được job đó.
+- **Xoá cột:** release 1 bỏ mọi chỗ đọc và ghi cột; release 2 xoá cột.
+- **Đổi tên cột**, ví dụ `note` thành `remark`: release 1 thêm `remark` và ghi cả hai cột; release 2 backfill `remark` từ `note`, chuyển đọc sang `remark` nhưng vẫn ghi cả hai; release 3 bỏ ghi và xoá `note`.
+- **Cột `NOT NULL` mới:** có default, hoặc thêm nullable, backfill, rồi siết `NOT NULL` ở release sau.
+- **Trigger chỉ-ghi-thêm và CHECK constraint:** nới trước, siết ở release sau, khi code cũ không còn ghi thứ bị cấm. Nới thì làm được ngay trong release cần nó, như `2026_09_17_110000_allow_sale_price_on_recorded_lines.php` thêm `'recorded'` vào `dispatch_lines_sale_price_kind`. Siết CHECK thì `ADD CONSTRAINT ... NOT VALID` rồi `VALIDATE CONSTRAINT`, để không khoá ghi cả bảng trong lúc quét.
+- **Tên bảng và class job:** giữ nguyên trong cùng release. Pod `app` cũ vẫn ghi vào bảng theo tên cũ và dispatch job theo class cũ, và worker mới phải chạy được job đó.

@@ -1,5 +1,7 @@
 # Khoá mã hoá nằm trên server; Người vận hành server là lỗ hổng audit được chấp nhận
 
+_Phần nơi đặt khoá bị thay bởi ADR 0010._
+
 Nội dung mã được mã hoá ở tầng ứng dụng, và khoá mã hoá, khoá HMAC nằm trong `.env` trên chính VPS chạy kho, không dùng KMS, Vault hay HSM. Vì vậy mã hoá chỉ bảo vệ khi DB hoặc backup bị lộ mà khoá không lộ theo. Nó không bảo vệ khi server bị chiếm, và **Người vận hành server** đọc được mọi nội dung mà không đi qua **Nhật ký xem mã**. Chúng tôi chấp nhận điều này vì shop chỉ có 1–10 nhân viên và chạy trên một VPS. Dịch vụ quản lý khoá bên ngoài sẽ thêm phụ thuộc và thêm chỗ có thể hỏng, trong khi ứng dụng đang chạy vẫn phải cầm khoá dạng rõ, nên mô hình rủi ro không đổi. Thay vào đó, rủi ro được kiểm soát bằng quy trình:
 - Chỉ chủ shop giữ quyền server lâu dài.
 - Người khác chỉ được cấp quyền server theo từng đợt, và khi họ rời đi thì xoay khoá.

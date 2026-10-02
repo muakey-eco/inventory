@@ -1,5 +1,7 @@
 # Kho chạy trên một node, và stack production từ chối nhiều node
 
+_Bị thay bởi ADR 0009._
+
 Kho chạy bằng Docker Compose trên **một** VPS: FrankenPHP, Postgres, queue worker và scheduler cùng một máy, sau một reverse proxy cùng máy đã cầm TLS. Chúng tôi từ chối hình thái nhiều node (Swarm, Kubernetes, nhiều VPS sau load balancer) không phải vì chưa cần, mà vì ứng dụng hiện tại sẽ **hỏng âm thầm** nếu có node thứ hai, và điều đó không đọc ra được từ code.
 
 ## Hệ quả

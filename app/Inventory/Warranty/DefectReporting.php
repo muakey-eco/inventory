@@ -10,6 +10,7 @@ use App\Inventory\Dispatch\DeliveryTemplate;
 use App\Inventory\Stock\SlotStatus;
 use App\Inventory\Stock\StockDefect;
 use App\Inventory\Stock\StockUnitStatus;
+use App\Inventory\Storage\StaleFiles;
 use App\Models\DefectReport;
 use App\Models\Delivery;
 use App\Models\Slot;
@@ -28,9 +29,6 @@ use Throwable;
  */
 class DefectReporting
 {
-    /** Ảnh khách gửi: disk private của app, không phải thư mục public. */
-    public const SCREENSHOT_DISK = 'local';
-
     public const SCREENSHOT_DIRECTORY = 'defect-reports';
 
     public function __construct(
@@ -66,7 +64,7 @@ class DefectReporting
                 $current = $this->lockDeliveries($deliveries);
                 $overrideReason = $this->ensureReportable($actor, $current, $draft->overrideReason);
                 // Lưu ảnh sau khi kiểm tra xong; các Báo lỗi cùng lần tạo dùng chung một file.
-                $screenshotPath = $draft->screenshot?->store(self::SCREENSHOT_DIRECTORY, self::SCREENSHOT_DISK) ?: null;
+                $screenshotPath = $draft->screenshot?->store(self::SCREENSHOT_DIRECTORY, self::screenshotDisk()) ?: null;
 
                 return array_map(fn (Delivery $delivery): DefectReport => $this->insert($actor, $current[$delivery->getKey()], $overrideReason, [
                     'status' => DefectReportStatus::Pending,
@@ -77,7 +75,7 @@ class DefectReporting
         } catch (Throwable $exception) {
             // Báo lỗi không tạo được thì không để lại ảnh.
             if ($screenshotPath !== null) {
-                Storage::disk(self::SCREENSHOT_DISK)->delete($screenshotPath);
+                Storage::disk(self::screenshotDisk())->delete($screenshotPath);
             }
 
             throw $exception;
@@ -92,16 +90,23 @@ class DefectReporting
      */
     public function purgeOrphanScreenshots(): int
     {
-        $disk = Storage::disk(self::SCREENSHOT_DISK);
-        $cutoff = now()->subHour()->getTimestamp();
-        $orphans = collect($disk->files(self::SCREENSHOT_DIRECTORY))
-            ->filter(fn (string $path): bool => $disk->lastModified($path) < $cutoff)
+        $disk = Storage::disk(self::screenshotDisk());
+        $orphans = collect(StaleFiles::in($disk, self::SCREENSHOT_DIRECTORY, now()->subHour()))
             ->diff(DefectReport::query()->whereNotNull('screenshot_path')->distinct()->pluck('screenshot_path'))
             ->values();
 
         $disk->delete($orphans->all());
 
         return $orphans->count();
+    }
+
+    /**
+     * Ảnh khách gửi: disk private (local hoặc S3, `inventory.defect.screenshot_disk`), không phải
+     * thư mục public.
+     */
+    public static function screenshotDisk(): string
+    {
+        return (string) config('inventory.defect.screenshot_disk');
     }
 
     /**

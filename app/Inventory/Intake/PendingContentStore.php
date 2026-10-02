@@ -4,6 +4,7 @@ namespace App\Inventory\Intake;
 
 use App\Inventory\Encryption\ContentCrypto;
 use App\Inventory\Encryption\EncryptedContent;
+use App\Inventory\Storage\StaleFiles;
 use App\Models\BatchLine;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Filesystem\Filesystem;
@@ -12,7 +13,7 @@ use SensitiveParameter;
 
 /**
  * Nội dung Dòng nhập chờ xác nhận (văn bản dán hoặc file gốc), mã hoá bằng khoá nội dung,
- * nằm trên ổ local của server (disk `inventory.intake.disk`), không trong DB nên không vào
+ * nằm trên disk `inventory.intake.disk` (ổ local hoặc S3), không trong DB nên không vào
  * backup. Xoá khi Lô nhập được xác nhận hoặc bỏ, hoặc khi bản kiểm tra hết hạn.
  *
  * Dòng bị bỏ của Lô nhập vừa xác nhận cũng nằm đây (mã hoá) trong thời hạn tải ngay sau xác
@@ -69,11 +70,10 @@ class PendingContentStore
     {
         $keep = array_fill_keys($pendingLineIds, true);
 
-        foreach (self::disk()->files('batch-lines') as $path) {
-            if (! isset($keep[(int) basename($path)]) && self::disk()->lastModified($path) < $writtenBefore->getTimestamp()) {
-                self::disk()->delete($path);
-            }
-        }
+        self::disk()->delete(array_values(array_filter(
+            StaleFiles::in(self::disk(), 'batch-lines', $writtenBefore),
+            fn (string $path): bool => ! isset($keep[(int) basename($path)]),
+        )));
     }
 
     /**
@@ -81,11 +81,7 @@ class PendingContentStore
      */
     public function purgeRejectedBefore(CarbonImmutable $writtenBefore): void
     {
-        foreach (self::disk()->files('batch-rejected') as $path) {
-            if (self::disk()->lastModified($path) < $writtenBefore->getTimestamp()) {
-                self::disk()->delete($path);
-            }
-        }
+        self::disk()->delete(StaleFiles::in(self::disk(), 'batch-rejected', $writtenBefore));
     }
 
     private function write(string $path, #[SensitiveParameter] string $content): void

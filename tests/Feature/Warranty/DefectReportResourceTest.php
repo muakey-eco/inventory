@@ -42,6 +42,7 @@ use Database\Seeders\RoleSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -78,6 +79,26 @@ function panelOrder(string $ref, int $quantity, string $customer): Dispatch
 {
     return app(ManualDispatch::class)->create(test()->seller, new DispatchDraft(test()->shopee, $ref, [new DispatchLineDraft(test()->netflix, $quantity)], customer: $customer));
 }
+
+it('ảnh Báo lỗi đi từ upload tạm trên S3 sang disk ảnh trên S3, không qua ổ local', function () {
+    // Upload tạm trên S3 như production: file chỉ đọc được qua disk, Livewire không tự dọn.
+    config(['livewire.temporary_file_upload.disk' => 's3']);
+    $uploads = fakeObjectStorage(FileUploadConfiguration::disk());
+    config(['inventory.defect.screenshot_disk' => 's3']);
+    $screenshots = fakeObjectStorage('s3');
+    $dispatch = panelOrder('SP-001', 1, 'Anh Minh');
+    $this->actingAs($this->seller);
+
+    Livewire::test(DispatchDeliveries::class, ['record' => $dispatch])
+        ->selectTableRecords([$dispatch->deliveries()->sole()->id])
+        ->callAction(TestAction::make('report')->table()->bulk(), data: ['description' => 'Không đăng nhập được', 'screenshot' => UploadedFile::fake()->image('anh.png')])
+        ->assertHasNoActionErrors();
+
+    expect($screenshots->allFiles())->toBe([(string) DefectReport::sole()->screenshot_path])
+        // Còn file meta .json Livewire ghi khi upload qua server; trên S3 trình duyệt upload thẳng, không có meta.
+        ->and(preg_grep('/\.json$/', $uploads->allFiles(), PREG_GREP_INVERT))->toBe([])
+        ->and(Storage::disk('local')->allFiles())->toBe([]);
+});
 
 it('Báo lỗi từ bảng Lần giao cho nhiều Slot: mô tả bắt buộc, ảnh tuỳ chọn; tạo lại sau Bác bỏ thì hiện lịch sử Bác bỏ', function () {
     $dispatch = panelOrder('SP-001', 2, 'Anh Minh');

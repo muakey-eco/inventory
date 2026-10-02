@@ -29,6 +29,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -109,6 +110,9 @@ it('Nhập kho dán hàng từ panel, xem trước rồi xác nhận', function 
 });
 
 it('Nhập kho tạo nhanh Nhà cung cấp, upload file Tài khoản kèm Dòng nhập dán; trùng trong kho phải tick khi xác nhận', function () {
+    // Upload tạm trên S3 như production: file chỉ đọc được qua disk, Livewire không tự dọn.
+    config(['livewire.temporary_file_upload.disk' => 's3']);
+    $uploads = fakeObjectStorage(FileUploadConfiguration::disk());
     $this->actingAs(staffMember(Role::NhapKho));
     $intake = app(BatchIntake::class);
     $intake->confirm($this->admin, $intake->submit($this->admin, new BatchDraft($this->supplier, CarbonImmutable::parse('2026-09-15'), [new BatchLineDraft($this->product, 1, 'AAAA-BBBB')])));
@@ -150,7 +154,9 @@ it('Nhập kho tạo nhanh Nhà cung cấp, upload file Tài khoản kèm Dòng 
 
     $batch = Batch::latest('id')->firstOrFail();
 
-    expect($batch->supplier->name)->toBe('G2A');
+    expect($batch->supplier->name)->toBe('G2A')
+        // Còn file meta .json Livewire ghi khi upload qua server; trên S3 trình duyệt upload thẳng, không có meta.
+        ->and(preg_grep('/\.json$/', $uploads->allFiles(), PREG_GREP_INVERT))->toBe([]);
 
     Livewire::test(ViewBatch::class, ['record' => $batch->getRouteKey()])
         ->assertSee('File CSV: netflix.csv')

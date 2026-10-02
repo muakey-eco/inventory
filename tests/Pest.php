@@ -18,9 +18,13 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Firebase\JWT\JWT;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use League\Flysystem\Filesystem;
+use Tests\Support\ObjectStorageFake;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
@@ -203,4 +207,17 @@ function signInViaAuthentik(array $claims = [], array $callback = []): TestRespo
         'state' => $query['state'],
         ...$callback,
     ]));
+}
+
+/**
+ * Thay disk bằng kho object giả như S3 ({@see ObjectStorageFake}): purge chỉ chạy được khi lấy
+ * thời điểm ghi từ một lần liệt kê thư mục.
+ */
+function fakeObjectStorage(string $disk): FilesystemAdapter
+{
+    $adapter = new ObjectStorageFake;
+    $storage = new FilesystemAdapter(new Filesystem($adapter), $adapter);
+    Storage::set($disk, $storage);
+
+    return $storage;
 }

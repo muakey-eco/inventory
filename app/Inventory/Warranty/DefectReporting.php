@@ -73,9 +73,10 @@ class DefectReporting
                 ]), $deliveries);
             });
         } catch (Throwable $exception) {
-            // Báo lỗi không tạo được thì không để lại ảnh.
+            // Báo lỗi không tạo được thì không để lại ảnh. Xoá lỗi (disk s3 ném) thì chỉ báo cáo,
+            // không che lỗi gốc; ảnh sót lại do lệnh purge dọn.
             if ($screenshotPath !== null) {
-                Storage::disk(self::screenshotDisk())->delete($screenshotPath);
+                rescue(fn () => Storage::disk(self::screenshotDisk())->delete($screenshotPath));
             }
 
             throw $exception;

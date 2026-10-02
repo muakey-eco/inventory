@@ -5,8 +5,10 @@
 # và tag theo commit sha để rollback được bằng cách đổi tag.
 set -euo pipefail
 
-REGISTRY="${REGISTRY:-ghcr.io}"
-REPO="${REPO:-nghianb/inventory}"
+# Registry private của tổ chức; cụm k3s kéo image bằng imagePullSecret. Source vẫn ở repo cá nhân,
+# nên nhãn source không suy ra từ tên image được.
+IMAGE="${IMAGE:-ghcr.io/muakey-eco/inventory}"
+SOURCE_REPO="${SOURCE_REPO:-nghianb/inventory}"
 
 cd "$(dirname "$0")/.."
 
@@ -17,7 +19,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 sha="$(git rev-parse --short HEAD)"
-image="${REGISTRY}/${REPO}"
+image="${IMAGE}"
 tag="git-${sha}"
 
 docker build \
@@ -26,7 +28,7 @@ docker build \
     --tag "${image}:${tag}" \
     --tag "${image}:latest" \
     --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
-    --label "org.opencontainers.image.source=https://github.com/${REPO}" \
+    --label "org.opencontainers.image.source=https://github.com/${SOURCE_REPO}" \
     .
 
 docker push "${image}:${tag}"
@@ -34,9 +36,10 @@ docker push "${image}:latest"
 
 cat <<EOF
 
-Xong. Trên VPS:
+Xong. Trên k3s: đổi tag thành ${tag} trong muakey-eco/k3s-ops, Argo CD tự đồng bộ.
+Trên VPS:
 
     INVENTORY_IMAGE=${image}:${tag} docker compose -f compose.prod.yaml up -d --wait
 
-Rollback: chạy lại đúng lệnh trên với tag cũ.
+Rollback: đặt lại tag cũ.
 EOF

@@ -2,13 +2,13 @@ name: inventory
 
 # Stack production. Chạy trên một VPS, sau một reverse proxy cùng máy đã cầm TLS (xem ADR 0005).
 #
-#   INVENTORY_IMAGE=ghcr.io/nghianb/inventory:git-a1b2c3d \
+#   INVENTORY_IMAGE=ghcr.io/muakey-eco/inventory:git-a1b2c3d \
 #       docker compose -f compose.prod.yaml up -d --wait
 #
 # Image không chứa secret: mọi biến nằm trong /srv/inventory/app.env (chmod 600), ngoài cây source.
 
 x-app: &app
-    image: ${INVENTORY_IMAGE:?chưa đặt INVENTORY_IMAGE, ví dụ ghcr.io/nghianb/inventory:git-a1b2c3d}
+    image: ${INVENTORY_IMAGE:?chưa đặt INVENTORY_IMAGE, ví dụ ghcr.io/muakey-eco/inventory:git-a1b2c3d}
     env_file:
         - /srv/inventory/app.env
     restart: unless-stopped

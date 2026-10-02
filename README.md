@@ -66,7 +66,7 @@ Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev serv
 
 ## Triển khai production
 
-Một VPS, sau một reverse proxy **cùng máy đã cầm TLS** (xem [ADR 0005](docs/adr/0005-kho-chay-tren-mot-node.md)). Image build thủ công trên máy dev rồi đẩy lên GHCR; VPS chỉ kéo image về, không cần source, không cần Composer hay Node.
+Một VPS, sau một reverse proxy **cùng máy đã cầm TLS** (xem [ADR 0005](docs/adr/0005-kho-chay-tren-mot-node.md)). Image build thủ công trên máy dev rồi đẩy lên Registry nội bộ (Bizfly Container Registry của Muakey); VPS chỉ kéo image về, không cần source, không cần Composer hay Node.
 
 ### Yêu cầu với reverse proxy
 
@@ -79,6 +79,7 @@ mkdir -p /srv/inventory
 # chép docker/prod/app.env.example và compose.prod.yaml từ repo sang /srv/inventory/
 vi /srv/inventory/app.env        # điền APP_KEY, ba khoá INVENTORY_*, mật khẩu DB, APP_URL, AUTHENTIK_*
 chmod 600 /srv/inventory/app.env
+docker login cr-hn-1.bizflycloud.vn   # image nằm ở Registry nội bộ, private
 ```
 
 Khoá sinh như ở phần Chạy lần đầu (`openssl rand -base64 32`, dạng `1:base64:…`). `DB_*` và `POSTGRES_*` trong file đó phải khớp từng cặp.
@@ -89,7 +90,7 @@ Khoá sinh như ở phần Chạy lần đầu (`openssl rand -base64 32`, dạn
 
 ```bash
 cd /srv/inventory
-export INVENTORY_IMAGE=ghcr.io/muakey-eco/inventory:git-<sha>
+export INVENTORY_IMAGE=cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory:git-<sha>
 docker compose -f compose.prod.yaml run --rm migrate
 docker compose -f compose.prod.yaml run --rm --no-deps app php artisan inventory:keys:register
 docker compose -f compose.prod.yaml run --rm --no-deps app php artisan db:seed --class=RoleSeeder --force
@@ -170,19 +171,88 @@ Trên VPS:
 
 ```bash
 cd /srv/inventory
-INVENTORY_IMAGE=ghcr.io/muakey-eco/inventory:git-<sha> docker compose -f compose.prod.yaml up -d --wait
+INVENTORY_IMAGE=cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory:git-<sha> docker compose -f compose.prod.yaml up -d --wait
 ```
 
 Service `migrate` chạy `migrate --force` đúng một lần rồi mới tới `app`, `queue`, `scheduler`, nên không có chuyện ba tiến trình đua nhau một migration. Deploy gián đoạn 15–60 giây. **Rollback** là chạy lại đúng lệnh trên với tag cũ — vì vậy đừng deploy bằng `:latest`.
 
 ### Chạy trên k3s
 
-Manifest nằm ở `muakey-eco/k3s-ops` (ADR 0009). `docker/build-prod.sh` đẩy image lên `ghcr.io/muakey-eco/inventory` (private), nên namespace cần `imagePullSecret` cho `ghcr.io`. Người build cần `docker login ghcr.io` bằng token có scope `write:packages` của tổ chức `muakey-eco`. Env lấy từ ConfigMap và Secret: image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
+Manifest nằm ở `applications/inventory/` của `muakey-eco/k3s-ops` (ADR 0009), Argo CD đồng bộ từ nhánh `main`. Panel ở `https://kho.muakeyoffice.net`, chỉ mở cho Tailscale, mạng riêng và dải pod của cụm. `docker/build-prod.sh` đẩy image lên Registry nội bộ `cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory`, người build cần `docker login cr-hn-1.bizflycloud.vn` trước. Manifest ghi image là `muakey/inventory`, và node tự ánh xạ bí danh đó sang Registry nội bộ, nên namespace không có `imagePullSecret` (ADR 0001 của k3s-ops). Env lấy từ ConfigMap (`config.env` trong k3s-ops) và Secret (`externalsecret.yaml`, kéo từ Infisical `/inventory/*`, ADR 0010): image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
 
-- **initContainer.** Cả ba Deployment `app`, `queue`, `scheduler` dùng cùng một initContainer, cùng image, `args: ["inventory-init"]`. Đặt `args`, không đặt `command`, để ENTRYPOINT vẫn chạy trước. Script chạy `migrate --force --isolated`, chờ tới khi không còn migration pending (tối đa `INVENTORY_MIGRATE_WAIT_SECONDS`, mặc định 600), rồi chạy `inventory:keys:verify`. Pod lấy được khoá trong bảng `cache_locks` là pod duy nhất migrate. Bảng đó phải có từ trước, nên **lần dựng đầu** (`migrate --force`, `inventory:keys:register`, `db:seed --class=RoleSeeder --force`) chạy bằng tay qua một Job hoặc `kubectl run`. Khoá chỉ loại trừ được giữa các pod khi cache store dùng chung, nên script từ chối chạy khi `CACHE_STORE` khác `database` hoặc `redis`. Pod giữ khoá chết giữa chừng thì khoá còn tới một giờ, và các pod khác hết hạn chờ rồi khởi động lại liên tục. Gỡ bằng `DELETE FROM cache_locks WHERE key LIKE '%framework/command-migrate%';`.
+**Deploy** là chạy `docker/build-prod.sh`, đổi `newTag` trong `applications/inventory/kustomization.yaml` của k3s-ops thành tag script in ra, rồi push lên `main`. `app` rolling hai replica nên không gián đoạn; `queue` và `scheduler` dừng vài giây. **Rollback** là đặt lại tag cũ, nhưng chỉ lùi an toàn được một release (migration theo expand/contract, xem AGENTS.md). Đổi secret trên Infisical không làm pod đổi theo: đợi Secret cập nhật (tối đa một giờ, hoặc `kubectl -n inventory annotate externalsecret inventory-secrets force-sync=$(date +%s) --overwrite`), rồi `kubectl -n inventory rollout restart deployment/app deployment/queue deployment/scheduler`.
+
+- **initContainer.** Cả ba Deployment `app`, `queue`, `scheduler` dùng cùng một initContainer, cùng image, `args: ["inventory-init"]`. Đặt `args`, không đặt `command`, để ENTRYPOINT vẫn chạy trước. Script chạy `migrate --force --isolated`, chờ tới khi không còn migration pending (tối đa `INVENTORY_MIGRATE_WAIT_SECONDS`, mặc định 600), rồi chạy `inventory:keys:verify`. Pod lấy được khoá trong bảng `cache_locks` là pod duy nhất migrate. Bảng đó phải có từ trước, nên **lần dựng đầu** (`migrate --force`, `inventory:keys:register`, `db:seed --class=RoleSeeder --force`) chạy bằng tay, xem [Dựng lần đầu trên k3s](#dựng-lần-đầu-trên-k3s). Khoá chỉ loại trừ được giữa các pod khi cache store dùng chung, nên script từ chối chạy khi `CACHE_STORE` khác `database` hoặc `redis`. Pod giữ khoá chết giữa chừng thì khoá còn tới một giờ, và các pod khác hết hạn chờ rồi khởi động lại liên tục. Gỡ bằng `DELETE FROM cache_locks WHERE key LIKE '%framework/command-migrate%';`.
 - **Container chính.** `app` giữ CMD mặc định (FrankenPHP cổng 8000). `queue` chạy `php artisan queue:work --tries=1`, `scheduler` chạy `php artisan schedule:work`.
 - **Probe.** `HEALTHCHECK` của image nền gọi admin Caddy cổng 2019. Kubelet bỏ qua `HEALTHCHECK`, nhưng đừng chép nó sang probe: `queue` và `scheduler` không chạy Caddy. Chỉ `app` có readiness/liveness probe, là `httpGet` `/up` cổng 8000. `queue` và `scheduler` không có probe HTTP.
-- **`readOnlyRootFilesystem: true`.** Cờ này đặt theo từng container, và initContainer cũng chạy ENTRYPOINT. Container nào bật thì phải gắn emptyDir vào `/app/storage` và `/tmp` (upload PHP), kể cả initContainer. `app` gắn thêm `/data` và `/config` (state của Caddy). Khi `bootstrap/cache` chỉ-đọc, entrypoint ghi cache cấu hình vào `/app/storage/framework/config.php`. Nếu khi đó `/app/storage` cũng chỉ-đọc thì container thoát ngay với lỗi nói rõ điều đó. Route cache và cache Filament nướng sẵn trong `bootstrap/cache` nên vẫn dùng được. View cache nướng trong `storage/framework/views` bị emptyDir che mất, nên view được biên dịch lại lúc chạy, mỗi pod một lần.
+- **`readOnlyRootFilesystem: true`.** Cờ này đặt theo từng container, và initContainer cũng chạy ENTRYPOINT. Container nào bật thì phải gắn emptyDir vào `/app/storage` và `/tmp` (upload PHP), kể cả initContainer. `app` gắn thêm `/data` và `/config` (state của Caddy). Khi `bootstrap/cache` chỉ-đọc, entrypoint ghi cache cấu hình vào `/app/storage/framework/config.php`. Nếu khi đó `/app/storage` cũng chỉ-đọc thì container thoát ngay với lỗi nói rõ điều đó. Route cache và cache Filament nướng sẵn trong `bootstrap/cache` nên vẫn dùng được. View cache nướng trong `storage/framework/views` bị emptyDir che mất, nên view được biên dịch lại lúc chạy, mỗi pod một lần. Manifest hiện chưa bật cờ này.
+
+#### Dựng lần đầu trên k3s
+
+Việc tay, làm một lần, cần người có quyền trên từng hệ thống. Làm theo thứ tự: pod chỉ chạy được khi đủ cả Secret lẫn database đã dựng.
+
+1. **Postgres** `postgres.muakeyoffice.net` (100.94.43.89): tạo user và database `inventory`, user là owner để migration tạo được trigger plpgsql. `pg_hba.conf` phải cho user này vào từ các node k3s, như các app khác.
+
+   ```sql
+   CREATE ROLE inventory LOGIN PASSWORD '<DB_PASSWORD>';
+   CREATE DATABASE inventory OWNER inventory;
+   ```
+
+2. **Bucket** private `muakey-inventory` trên `https://s3.muakey.com`, với CORS cho origin của panel, vì upload tạm của Livewire đi thẳng từ trình duyệt lên bucket:
+
+   ```bash
+   aws --endpoint-url https://s3.muakey.com s3api create-bucket --bucket muakey-inventory
+   aws --endpoint-url https://s3.muakey.com s3api put-bucket-cors --bucket muakey-inventory --cors-configuration '{
+     "CORSRules": [{
+       "AllowedOrigins": ["https://kho.muakeyoffice.net"],
+       "AllowedMethods": ["PUT", "GET"],
+       "AllowedHeaders": ["*"],
+       "MaxAgeSeconds": 3600
+     }]
+   }'
+   ```
+
+3. **Authentik** `https://auth.muakeyoffice.net`: làm đủ các bước ở [Đăng nhập qua Authentik](#đăng-nhập-qua-authentik), [Đối soát nhân viên](#đối-soát-nhân-viên-với-authentik) (service account `kho-sync`) và [Back-channel logout](#back-channel-logout-từ-authentik), với slug Application là `inventory` và:
+   - Redirect URI (strict): `https://kho.muakeyoffice.net/admin/auth/callback`.
+   - Logout URI: `http://app.inventory.svc/auth/authentik/backchannel-logout`. Authentik chạy trong cùng cụm nên gọi thẳng Service `app`, không qua ingress (ingress chỉ mở cho mạng nội bộ).
+
+   Client ID là cấu hình, không phải bí mật: ghi vào `AUTHENTIK_CLIENT_ID` trong `applications/inventory/config.env` của k3s-ops. Tới lúc đó pod vẫn chạy, chỉ đăng nhập là hỏng.
+
+4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ mười khoá mà `externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
+
+   | Khoá | Giá trị |
+   |---|---|
+   | `APP_KEY` | `echo "base64:$(openssl rand -base64 32)"` |
+   | `INVENTORY_CONTENT_KEY`, `INVENTORY_HMAC_KEY`, `INVENTORY_BACKUP_KEY` | mỗi khoá một lần `echo "1:base64:$(openssl rand -base64 32)"` |
+   | `INVENTORY_CONTENT_PREVIOUS_KEYS` | rỗng |
+   | `DB_PASSWORD` | mật khẩu ở bước 1 |
+   | `AUTHENTIK_CLIENT_SECRET`, `AUTHENTIK_API_TOKEN` | từ bước 3 |
+   | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | access key của versitygw, quyền đọc ghi bucket `muakey-inventory` |
+
+   Ba khoá `INVENTORY_*_KEY` cần một bản sao ngoài Infisical, tách khỏi backup Postgres và bucket (ADR 0001, 0010): mất khoá nội dung là mất toàn bộ hàng.
+
+5. **Image**: `docker/build-prod.sh`, rồi đặt tag nó in ra vào `newTag` trong k3s-ops và push lên `main`.
+
+Lần sync đầu, mọi pod kẹt ở initContainer `migrate` vì database còn trống (chưa có bảng `cache_locks`). Đó là dự kiến. Chạy lần dựng đầu bằng một pod tạm, cùng image và cùng env với Deployment:
+
+```bash
+image=$(kubectl -n inventory get deploy app -o jsonpath='{.spec.template.spec.containers[0].image}')
+config=$(kubectl -n inventory get deploy app -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
+kubectl -n inventory run bootstrap --rm -i --restart=Never --image="$image" --overrides="{
+  \"spec\": {
+    \"automountServiceAccountToken\": false,
+    \"containers\": [{
+      \"name\": \"bootstrap\",
+      \"image\": \"$image\",
+      \"args\": [\"sh\", \"-c\", \"php artisan migrate --force && php artisan inventory:keys:register && php artisan db:seed --class=RoleSeeder --force\"],
+      \"envFrom\": [{\"configMapRef\": {\"name\": \"$config\"}}, {\"secretRef\": {\"name\": \"inventory-secrets\"}}]
+    }]
+  }
+}"
+kubectl -n inventory rollout restart deployment/app deployment/queue deployment/scheduler
+```
+
+Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho-quan-tri` đăng nhập. Nghiệm thu bằng tay: đăng nhập qua Authentik, nhập một Lô nhập, xuất kho, gửi một Báo lỗi có ảnh, rồi deploy một tag mới trong lúc gọi `/up` liên tục để thấy `app` không gián đoạn.
 
 ### File trên S3-compatible (k3s)
 

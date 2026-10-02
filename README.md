@@ -175,9 +175,15 @@ INVENTORY_IMAGE=ghcr.io/nghianb/inventory:git-<sha> docker compose -f compose.pr
 
 Service `migrate` chạy `migrate --force` đúng một lần rồi mới tới `app`, `queue`, `scheduler`, nên không có chuyện ba tiến trình đua nhau một migration. Deploy gián đoạn 15–60 giây. **Rollback** là chạy lại đúng lệnh trên với tag cũ — vì vậy đừng deploy bằng `:latest`.
 
+### File trên S3-compatible (k3s)
+
+Trên k3s pod không giữ state cục bộ (ADR 0009): nội dung Lô nhập chờ xác nhận, ảnh Báo lỗi và upload tạm Livewire nằm trên bucket S3-compatible (versitygw tại `https://s3.muakey.com`, bucket `muakey-inventory`), qua disk `s3`. Đặt `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET`, `AWS_ENDPOINT`, `AWS_USE_PATH_STYLE_ENDPOINT=true`, rồi `INVENTORY_INTAKE_DISK=s3`, `INVENTORY_DEFECT_SCREENSHOT_DISK=s3`, `LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK=s3`. Không đặt ba biến cuối thì kho dùng ổ local như stack VPS ở trên, và dev cùng test chạy như cũ.
+
+Mỗi loại một thư mục trong bucket: `batch-lines/` và `batch-rejected/` (mã hoá), `defect-reports/`, `livewire-tmp/`. Upload tạm đi thẳng từ trình duyệt lên bucket bằng URL ký sẵn, nên bucket phải cho CORS `PUT` từ origin của panel. File trong `livewire-tmp/` là **bản rõ** tới khi `inventory:intake:purge` xoá (ADR 0010). Lệnh purge đọc thời điểm ghi từ một lần liệt kê thư mục, không gửi HEAD cho từng file.
+
 ### Những gì stack này không lo
 
-- **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi (`storage/app/private/defect-reports`, trong volume `app-storage`) là việc riêng. `INVENTORY_BACKUP_KEY` hiện mới chỉ đăng ký dấu vân tay, **chưa mã hoá bản backup nào**. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
+- **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket khi chạy trên k3s, hoặc ở `storage/app/private/defect-reports` trong volume `app-storage` khi chạy disk local. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. `INVENTORY_BACKUP_KEY` hiện mới chỉ đăng ký dấu vân tay, **chưa mã hoá bản backup nào**. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
 - **TLS, tên miền, chứng chỉ**: của reverse proxy.
 
 ## Khoá mã hoá
@@ -196,7 +202,7 @@ Khoá nội dung, khoá HMAC và khoá backup nằm trong `.env`, tách khỏi `
 - Lô nhập gồm nhiều Dòng nhập, mỗi dòng một Sản phẩm: dán văn bản hoặc upload CSV/XLSX (dòng tiêu đề trùng định danh hoặc tên Trường nội dung; cột `slot`, `han_su_dung`, `gia_von` ghi đè Dòng nhập; cột khác bị bỏ qua và báo lại).
 - Giới hạn mỗi file hoặc danh sách dán: `INVENTORY_INTAKE_MAX_LINES` (mặc định 20.000 dòng), `INVENTORY_INTAKE_MAX_BYTES` (mặc định 10 MB).
 - Huỷ nhập (chỉ Quản trị, ở màn Lô nhập đã xác nhận): theo một Dòng nhập hoặc cả Lô nhập. Chỉ Đơn vị hàng Hoạt động mà mọi Slot còn Còn hàng chuyển sang Đã huỷ nhập và nhả Khoá chống trùng (cờ `holds_dedupe_key`, cả hai partial unique index đều tính cờ này), nên nhập lại được đúng mã; bản ghi giữ lại, mỗi lần chuyển trạng thái ghi Sổ biến động kho. Huỷ nhập một Tài khoản nhập lại thì Đơn vị hàng cũ chiếm lại khoá.
-- Nội dung chờ xác nhận nằm mã hoá ở `storage/app/intake` (đổi bằng `INVENTORY_INTAKE_PATH`), trên ổ local, **không đưa vào backup**. Xoá khi xác nhận hoặc bỏ; service `scheduler` chạy `inventory:intake:purge` mỗi giờ để cho hết hạn bản kiểm tra quá `INVENTORY_INTAKE_PENDING_TTL_HOURS` (mặc định 24) giờ.
+- Nội dung chờ xác nhận nằm mã hoá trên disk `INVENTORY_INTAKE_DISK`: mặc định `storage/app/intake` (đổi bằng `INVENTORY_INTAKE_PATH`), trên k3s là bucket S3. **Không đưa vào backup**. Xoá khi xác nhận hoặc bỏ; service `scheduler` chạy `inventory:intake:purge` mỗi giờ để cho hết hạn bản kiểm tra quá `INVENTORY_INTAKE_PENDING_TTL_HOURS` (mặc định 24) giờ.
 
 ## Xuất kho
 
@@ -300,7 +306,7 @@ Khoá nội dung, khoá HMAC và khoá backup nằm trong `.env`, tách khỏi `
 
 ## Báo lỗi
 
-- Tạo (Quản trị, Bán hàng) ở bảng Lần giao của Phiếu xuất: từng dòng hoặc chọn nhiều dòng, mỗi Slot một Báo lỗi Chờ xác minh (`DefectReporting::report`), mô tả bắt buộc, ảnh tuỳ chọn: form không lưu file, `DefectReporting` chỉ lưu vào disk `local` (thư mục `defect-reports`, private) sau khi kiểm tra xong và xoá lại nếu transaction lỗi; service `scheduler` chạy `inventory:defect-reports:purge` mỗi giờ để xoá ảnh cũ hơn một giờ không còn Báo lỗi nào trỏ tới. Cả phần tạo đủ hoặc thất bại. Bán hàng chỉ tạo trong Hạn bảo hành (tính cả ngày hết hạn) của lần giao có thời hạn bảo hành khác 0; Quản trị vượt được kèm lý do (`warranty_override_reason`, chỉ lưu cho lần giao ngoài bảo hành).
+- Tạo (Quản trị, Bán hàng) ở bảng Lần giao của Phiếu xuất: từng dòng hoặc chọn nhiều dòng, mỗi Slot một Báo lỗi Chờ xác minh (`DefectReporting::report`), mô tả bắt buộc, ảnh tuỳ chọn: form không lưu file, `DefectReporting` chỉ lưu vào disk `INVENTORY_DEFECT_SCREENSHOT_DISK` (mặc định `local`, trên k3s là `s3`; thư mục `defect-reports`, private) sau khi kiểm tra xong và xoá lại nếu transaction lỗi; service `scheduler` chạy `inventory:defect-reports:purge` mỗi giờ để xoá ảnh cũ hơn một giờ không còn Báo lỗi nào trỏ tới. Cả phần tạo đủ hoặc thất bại. Bán hàng chỉ tạo trong Hạn bảo hành (tính cả ngày hết hạn) của lần giao có thời hạn bảo hành khác 0; Quản trị vượt được kèm lý do (`warranty_override_reason`, chỉ lưu cho lần giao ngoài bảo hành).
 - Mỗi Slot tối đa một Báo lỗi Chờ xác minh hoặc Xác nhận (partial unique index `defect_reports_one_open_per_slot`); tạo lại được sau Bác bỏ, form hiện các lần Bác bỏ trước.
 - Trong lúc Chờ xác minh, Slot Còn hàng của cùng Đơn vị hàng không thuộc Tồn bán được (`SellableStock`), nên không được chọn khi xuất; tạo Báo lỗi khoá Đơn vị hàng như Huỷ hàng để phiếu đang chọn Slot của nó giao xong trước. Bác bỏ thì mở bán lại. Slot đang có Báo lỗi Chờ xác minh không Huỷ hàng hay Giao thay được (`StockVoid::pendingDefectReportId`); phải xác minh trước.
 - Trang Báo lỗi (menu Báo lỗi): Xem mã (`ContentReveal::revealDefectReport`, chỉ khi Chờ xác minh, ghi Nhật ký xem mã ngữ cảnh Báo lỗi), Xác nhận hoặc Bác bỏ với ghi chú bắt buộc; người tạo tự xác minh được. Xác nhận chọn Phạm vi lỗi: cả Đơn vị hàng (mặc định; Đơn vị hàng Hoạt động → Lỗi, ghi Sổ biến động kho; Đơn vị hàng Đã huỷ chỉ Xác nhận được chỉ Slot) hoặc chỉ Slot (Đơn vị hàng giữ nguyên).

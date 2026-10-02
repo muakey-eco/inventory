@@ -22,7 +22,8 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    Storage::fake('intake');
+    // Disk nhập hàng như trên S3: purge không hỏi thời điểm ghi từng file.
+    fakeObjectStorage('intake');
     $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 

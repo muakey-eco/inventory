@@ -38,7 +38,8 @@ return [
             'report' => false,
         ],
 
-        // Nội dung Lô nhập chờ xác nhận (đã mã hoá). Ổ local của server, không vào backup.
+        // Nội dung Lô nhập chờ xác nhận (đã mã hoá) khi chạy một máy. Trên k3s đặt
+        // INVENTORY_INTAKE_DISK=s3 (ADR 0009). Không vào backup.
         'intake' => [
             'driver' => 'local',
             'root' => env('INVENTORY_INTAKE_PATH', storage_path('app/intake')),
@@ -56,6 +57,8 @@ return [
             'report' => false,
         ],
 
+        // Bucket S3-compatible trên k3s (ADR 0009): nội dung Lô nhập chờ xác nhận, ảnh Báo lỗi và
+        // upload tạm Livewire, mỗi loại một thư mục. Ghi lỗi thì nổ, không im lặng mất file.
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -65,7 +68,7 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            'throw' => true,
             'report' => false,
         ],
 

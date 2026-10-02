@@ -41,7 +41,8 @@ use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
 
 beforeEach(function () {
-    Storage::fake('intake');
+    // Disk nhập hàng như trên S3: purge không hỏi thời điểm ghi từng file.
+    fakeObjectStorage('intake');
     $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
@@ -456,6 +457,9 @@ it('nội dung chờ xác nhận nằm mã hoá trên disk nhập hàng, xoá kh
 
 it('bản kiểm tra chưa xác nhận quá 24 giờ: không xác nhận được, lệnh dọn xoá nội dung tạm và file upload tạm', function () {
     $product = steamWallet();
+    $uploads = fakeObjectStorage(FileUploadConfiguration::disk());
+    $staleUpload = FileUploadConfiguration::directory().'/stale-upload.csv';
+    $uploads->put($staleUpload, 'a@shop.test,pw');
     $stale = $this->intake->submit($this->admin, pasteBatch($product, 'AAAA-BBBB'));
     $this->travel(23)->hours();
     $fresh = $this->intake->submit($this->admin, pasteBatch($product, 'CCCC-DDDD'));
@@ -463,12 +467,6 @@ it('bản kiểm tra chưa xác nhận quá 24 giờ: không xác nhận đượ
 
     expect(fn () => $this->intake->confirm($this->admin, $stale))
         ->toThrow(InvalidBatch::class, 'Bản kiểm tra quá 24 giờ chưa xác nhận nên nội dung tạm đã bị xoá; hãy tạo lại Lô nhập.');
-
-    Storage::fake(FileUploadConfiguration::disk());
-    $uploads = FileUploadConfiguration::storage();
-    $staleUpload = FileUploadConfiguration::directory().'/stale-upload.csv';
-    $uploads->put($staleUpload, 'a@shop.test,pw');
-    touch($uploads->path($staleUpload), now()->subHours(25)->getTimestamp());
 
     $this->artisan('inventory:intake:purge')->assertSuccessful();
 

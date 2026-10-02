@@ -8,6 +8,7 @@ use App\Filament\Resources\Dispatches\DispatchResource;
 use App\Filament\Resources\StockUnits\StockUnitResource;
 use App\Filament\Support\NavGroup;
 use App\Inventory\Dispatch\AffectedDelivery;
+use App\Inventory\Warranty\DefectReporting;
 use App\Inventory\Warranty\DefectReportStatus;
 use App\Inventory\Warranty\DefectResolution;
 use App\Models\DefectReport;
@@ -76,7 +77,7 @@ class DefectReportResource extends Resource
                         ->visible(fn (DefectReport $record): bool => $record->source_defect_report_id !== null),
                     ImageEntry::make('screenshot_path')
                         ->label('Ảnh')
-                        ->disk('local')
+                        ->disk(DefectReporting::screenshotDisk())
                         ->visibility('private')
                         ->visible(fn (DefectReport $record): bool => $record->screenshot_path !== null)
                         ->columnSpanFull(),

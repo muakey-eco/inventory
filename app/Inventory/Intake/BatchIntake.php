@@ -18,6 +18,7 @@ use App\Inventory\Stock\SlotStatus;
 use App\Inventory\Stock\StockLedger;
 use App\Inventory\Stock\StockTransition;
 use App\Inventory\Stock\StockUnitStatus;
+use App\Inventory\Storage\StaleFiles;
 use App\Models\Batch;
 use App\Models\BatchLine;
 use App\Models\Product;
@@ -913,11 +914,7 @@ class BatchIntake
     {
         $storage = FileUploadConfiguration::storage();
 
-        foreach ($storage->files(FileUploadConfiguration::directory()) as $path) {
-            if ($storage->lastModified($path) < $cutoff->getTimestamp()) {
-                $storage->delete($path);
-            }
-        }
+        $storage->delete(StaleFiles::in($storage, FileUploadConfiguration::directory(), $cutoff));
     }
 
     /**

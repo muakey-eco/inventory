@@ -434,18 +434,26 @@ it('ảnh chỉ được lưu khi Báo lỗi tạo thành công', function () {
 });
 
 it('dọn ảnh Báo lỗi không còn Báo lỗi nào trỏ tới sau một giờ', function () {
+    $disk = fakeObjectStorage('local');
     defectStock($this->steam, "SR1\tA-1");
     [$delivery] = defectDeliveries(defectOrder('SP-001', [$this->steam->id => 1]));
     [$report] = $this->reports->report($this->seller, [$delivery], new DefectReportDraft('Lỗi', screenshot: UploadedFile::fake()->image('anh.png')));
-    $disk = Storage::disk('local');
     $disk->put('defect-reports/mo-coi-cu.png', 'x');
     $this->travel(2)->hours();
     $disk->put('defect-reports/mo-coi-moi.png', 'x');
-    touch($disk->path('defect-reports/mo-coi-moi.png'), now()->getTimestamp());
-    touch($disk->path('defect-reports/mo-coi-cu.png'), now()->subHours(2)->getTimestamp());
-    touch($disk->path((string) $report->screenshot_path), now()->subHours(2)->getTimestamp());
 
     $this->artisan('inventory:defect-reports:purge')->expectsOutput('Đã xoá 1 ảnh Báo lỗi không còn dùng.')->assertSuccessful();
 
     expect($disk->allFiles('defect-reports'))->toEqualCanonicalizing([(string) $report->screenshot_path, 'defect-reports/mo-coi-moi.png']);
+});
+
+it('ảnh Báo lỗi nằm trên disk cấu hình, không phải disk local', function () {
+    config(['inventory.defect.screenshot_disk' => 's3']);
+    $disk = fakeObjectStorage('s3');
+    defectStock($this->steam, "SR1\tA-1");
+    [$delivery] = defectDeliveries(defectOrder('SP-001', [$this->steam->id => 1]));
+    [$report] = $this->reports->report($this->seller, [$delivery], new DefectReportDraft('Lỗi', screenshot: UploadedFile::fake()->image('anh.png')));
+
+    expect($disk->allFiles('defect-reports'))->toBe([(string) $report->screenshot_path])
+        ->and(Storage::disk('local')->allFiles())->toBe([]);
 });

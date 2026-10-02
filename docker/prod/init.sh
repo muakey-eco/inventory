@@ -1,20 +1,25 @@
 #!/bin/sh
-# initContainer chung của mọi pod (`app`, `queue`, `scheduler`), xem ADR 0009.
+# initContainer chung của mọi pod (`app`, `queue`, `scheduler`), xem ADR 0009 và mục "Chạy trên k3s"
+# của README (lần dựng đầu, gỡ khoá khi pod giữ khoá chết giữa chừng).
 #
-# Ba pod cùng chạy script này một lúc. `--isolated` giữ một khoá trên cache store (CACHE_STORE=database,
-# bảng `cache_locks`): pod lấy được khoá chạy migrate, pod kia thoát ngay với mã 0 rồi chờ ở bước 2.
-# Vì vậy bảng `cache_locks` phải có sẵn từ trước: lần dựng đầu migrate bằng tay.
-#
-# Pod giữ khoá chết giữa chừng thì khoá còn tới một giờ, và các pod khác hết hạn chờ rồi khởi động lại
-# liên tục. Gỡ bằng tay: DELETE FROM cache_locks WHERE key LIKE '%framework/command-migrate%';
+# Mọi pod cùng chạy script này một lúc. `--isolated` giữ một khoá trên cache store: pod lấy được khoá
+# chạy migrate, các pod còn lại thoát ngay với mã 0 rồi chờ ở vòng lặp bên dưới. Khoá chỉ loại trừ được
+# giữa các pod khi cache store dùng chung, nên store khác bị từ chối ở đây.
 set -eu
+
+case "${CACHE_STORE:-database}" in
+    database | redis) ;;
+    *)
+        echo "CACHE_STORE=${CACHE_STORE} không dùng chung giữa các pod: mọi pod sẽ cùng migrate." >&2
+        exit 1
+        ;;
+esac
 
 wait_seconds="${INVENTORY_MIGRATE_WAIT_SECONDS:-600}"
 
 php artisan migrate --force --isolated
 
-# Pod không lấy được khoá tới đây trong khi pod kia còn đang migrate. `migrate:status --pending=1`
-# thoát mã 1 khi còn migration pending, và cũng thoát khác 0 khi chưa tới được DB: cả hai đều là "chờ".
+# `migrate:status --pending=1` thoát mã 1 khi còn migration pending.
 deadline=$(( $(date +%s) + wait_seconds ))
 until status="$(php artisan migrate:status --pending=1 2>&1)"; do
     if [ "$(date +%s)" -ge "$deadline" ]; then

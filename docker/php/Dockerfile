@@ -90,6 +90,8 @@ COPY --from=vendor --chown=app:app /app /app
 COPY --from=assets --chown=app:app /app/public/build /app/public/build
 
 COPY --chmod=0755 docker/prod/entrypoint.sh /usr/local/bin/inventory-entrypoint
+# initContainer trên k3s: `args: ["inventory-init"]`, giữ ENTRYPOINT để có cache cấu hình.
+COPY --chmod=0755 docker/prod/init.sh /usr/local/bin/inventory-init
 
 # Cache route, view và component Filament nướng luôn vào image: chúng chỉ phụ thuộc code.
 # Cache cấu hình thì KHÔNG, vì nó phụ thuộc secret — xem entrypoint.

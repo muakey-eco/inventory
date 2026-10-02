@@ -89,7 +89,7 @@ Khoá sinh như ở phần Chạy lần đầu (`openssl rand -base64 32`, dạn
 
 ```bash
 cd /srv/inventory
-export INVENTORY_IMAGE=ghcr.io/nghianb/inventory:git-<sha>
+export INVENTORY_IMAGE=ghcr.io/muakey-eco/inventory:git-<sha>
 docker compose -f compose.prod.yaml run --rm migrate
 docker compose -f compose.prod.yaml run --rm --no-deps app php artisan inventory:keys:register
 docker compose -f compose.prod.yaml run --rm --no-deps app php artisan db:seed --class=RoleSeeder --force
@@ -170,10 +170,19 @@ Trên VPS:
 
 ```bash
 cd /srv/inventory
-INVENTORY_IMAGE=ghcr.io/nghianb/inventory:git-<sha> docker compose -f compose.prod.yaml up -d --wait
+INVENTORY_IMAGE=ghcr.io/muakey-eco/inventory:git-<sha> docker compose -f compose.prod.yaml up -d --wait
 ```
 
 Service `migrate` chạy `migrate --force` đúng một lần rồi mới tới `app`, `queue`, `scheduler`, nên không có chuyện ba tiến trình đua nhau một migration. Deploy gián đoạn 15–60 giây. **Rollback** là chạy lại đúng lệnh trên với tag cũ — vì vậy đừng deploy bằng `:latest`.
+
+### Chạy trên k3s
+
+Manifest nằm ở `muakey-eco/k3s-ops` (ADR 0009). `docker/build-prod.sh` đẩy image lên `ghcr.io/muakey-eco/inventory` (private), nên namespace cần `imagePullSecret` cho `ghcr.io`. Người build cần `docker login ghcr.io` bằng token có scope `write:packages` của tổ chức `muakey-eco`. Env lấy từ ConfigMap và Secret: image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
+
+- **initContainer.** Cả ba Deployment `app`, `queue`, `scheduler` dùng cùng một initContainer, cùng image, `args: ["inventory-init"]`. Đặt `args`, không đặt `command`, để ENTRYPOINT vẫn chạy trước. Script chạy `migrate --force --isolated`, chờ tới khi không còn migration pending (tối đa `INVENTORY_MIGRATE_WAIT_SECONDS`, mặc định 600), rồi chạy `inventory:keys:verify`. Pod lấy được khoá trong bảng `cache_locks` là pod duy nhất migrate. Bảng đó phải có từ trước, nên **lần dựng đầu** (`migrate --force`, `inventory:keys:register`, `db:seed --class=RoleSeeder --force`) chạy bằng tay qua một Job hoặc `kubectl run`. Khoá chỉ loại trừ được giữa các pod khi cache store dùng chung, nên script từ chối chạy khi `CACHE_STORE` khác `database` hoặc `redis`. Pod giữ khoá chết giữa chừng thì khoá còn tới một giờ, và các pod khác hết hạn chờ rồi khởi động lại liên tục. Gỡ bằng `DELETE FROM cache_locks WHERE key LIKE '%framework/command-migrate%';`.
+- **Container chính.** `app` giữ CMD mặc định (FrankenPHP cổng 8000). `queue` chạy `php artisan queue:work --tries=1`, `scheduler` chạy `php artisan schedule:work`.
+- **Probe.** `HEALTHCHECK` của image nền gọi admin Caddy cổng 2019. Kubelet bỏ qua `HEALTHCHECK`, nhưng đừng chép nó sang probe: `queue` và `scheduler` không chạy Caddy. Chỉ `app` có readiness/liveness probe, là `httpGet` `/up` cổng 8000. `queue` và `scheduler` không có probe HTTP.
+- **`readOnlyRootFilesystem: true`.** Cờ này đặt theo từng container, và initContainer cũng chạy ENTRYPOINT. Container nào bật thì phải gắn emptyDir vào `/app/storage` và `/tmp` (upload PHP), kể cả initContainer. `app` gắn thêm `/data` và `/config` (state của Caddy). Khi `bootstrap/cache` chỉ-đọc, entrypoint ghi cache cấu hình vào `/app/storage/framework/config.php`. Nếu khi đó `/app/storage` cũng chỉ-đọc thì container thoát ngay với lỗi nói rõ điều đó. Route cache và cache Filament nướng sẵn trong `bootstrap/cache` nên vẫn dùng được. View cache nướng trong `storage/framework/views` bị emptyDir che mất, nên view được biên dịch lại lúc chạy, mỗi pod một lần.
 
 ### File trên S3-compatible (k3s)
 

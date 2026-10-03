@@ -104,7 +104,7 @@ Cấu hình một lần trên Authentik:
 
 1. **Service account** (Directory → Users → Create Service Account), ví dụ `kho-sync`. Bỏ chọn tạo token có hạn.
 2. **Role** (Directory → Roles) có hai quyền `authentik_core.view_user` (Can view User) và `authentik_core.view_group` (Can view Group), gán cho service account (trực tiếp, hoặc qua một group chỉ chứa nó). Không cấp quyền ghi nào.
-3. **Token** (Directory → Tokens and App passwords → Create) cho service account: Intent **API Token**, **bỏ Expiring**. Token có hạn bị Authentik tự xoay giá trị khi hết hạn, kho sẽ mất kết nối mà không ai đổi `.env`.
+3. **Token** (Directory → Tokens and App passwords → Create) cho service account: Intent **API Token**, **bỏ Expiring**. Token có hạn bị Authentik tự xoay giá trị khi hết hạn, kho sẽ mất kết nối mà không ai đổi secret.
 
 Rồi đặt token vào `AUTHENTIK_API_TOKEN` trên Infisical.
 
@@ -203,18 +203,18 @@ Trên k3s pod không giữ state cục bộ (ADR 0009): nội dung Lô nhập ch
 
 Mỗi loại một thư mục trong bucket: `batch-lines/` và `batch-rejected/` (mã hoá), `defect-reports/`, `livewire-tmp/`. Upload tạm đi thẳng từ trình duyệt lên bucket bằng URL ký sẵn, nên bucket phải cho CORS `PUT` từ origin của panel. File trong `livewire-tmp/` là **bản rõ** tới khi `inventory:intake:purge` xoá (ADR 0010). Lệnh purge đọc thời điểm ghi từ một lần liệt kê thư mục, không gửi HEAD cho từng file.
 
-### Những gì stack này không lo
+### Những gì production chưa lo
 
 - **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. `INVENTORY_BACKUP_KEY` hiện mới chỉ đăng ký dấu vân tay, **chưa mã hoá bản backup nào**. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
 - **TLS, tên miền, chứng chỉ**: của ingress trong k3s-ops.
 
 ## Khoá mã hoá
 
-Khoá nội dung, khoá HMAC và khoá backup nằm trong `.env`, tách khỏi `APP_KEY` (xem ADR 0001). Mỗi khoá có phiên bản; DB chỉ lưu dấu vân tay của khoá, không lưu giá trị. Giữ bản sao khoá ngoài server, tách khỏi backup: mất khoá nội dung là mất toàn bộ hàng.
+Khoá nội dung, khoá HMAC và khoá backup nằm trên Infisical (`.env` ở dev), tách khỏi `APP_KEY` (xem ADR 0001, ADR 0010). Mỗi khoá có phiên bản; DB chỉ lưu dấu vân tay của khoá, không lưu giá trị. Giữ bản sao khoá ngoài server, tách khỏi backup: mất khoá nội dung là mất toàn bộ hàng.
 
 - `php artisan inventory:keys:register`: đăng ký dấu vân tay các khoá mới (lần đầu, hoặc khi thêm phiên bản). Không ghi đè dấu vân tay đã có; ghi Nhật ký bảo mật.
 - `php artisan inventory:keys:verify`: chạy trước khi web server khởi động; queue worker cũng tự kiểm tra khi khởi động. Khoá không khớp thì từ chối chạy.
-- `php artisan inventory:keys:rotate <content|hmac|backup>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa `.env` trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`) rồi chạy lệnh **ngay**: từ lúc `.env` đổi tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
+- `php artisan inventory:keys:rotate <content|hmac|backup>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa khoá trên Infisical trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`), cho pod nhận secret mới như ở [Chạy trên k3s](#chạy-trên-k3s), rồi chạy lệnh **ngay** qua `kubectl -n inventory exec deploy/app --`: từ lúc pod nhận khoá mới tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
   - `content`: mã hoá lại từng chunk 500 Đơn vị hàng (`secret_key_version` trên bản ghi cho biết còn ai ở khoá cũ). Kho chạy bình thường suốt lúc chạy vì bản ghi chưa mã hoá lại vẫn đọc được bằng khoá cũ. Giữ khoá cũ trong `INVENTORY_CONTENT_PREVIOUS_KEYS` thêm ít nhất `INVENTORY_INTAKE_PENDING_TTL_HOURS` giờ: nội dung Lô nhập chờ xác nhận nằm trên disk còn mã hoá bằng khoá đó.
   - `hmac`: tính lại `stock_units.dedupe_hash` từ chính nội dung hàng, không cần khoá HMAC cũ. Nhập hàng tạm dừng chừng nào còn Đơn vị hàng ở `dedupe_hmac_version` cũ (kho không giữ song song hai hash), xuất kho vẫn chạy vì Thứ tự xuất không đọc Khoá chống trùng; tra cứu theo Khoá chống trùng không tìm thấy trong lúc lệnh chạy dở. Xem ADR 0003.
   - `backup`: chỉ thêm dấu vân tay phiên bản mới, không đụng dữ liệu trong app; backup cũ vẫn cần khoá cũ.

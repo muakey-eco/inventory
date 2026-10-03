@@ -5,9 +5,10 @@
 # và tag theo commit sha để rollback được bằng cách đổi tag.
 set -euo pipefail
 
-# Registry private của tổ chức; cụm k3s kéo image bằng imagePullSecret. Source vẫn ở repo cá nhân,
-# nên nhãn source không suy ra từ tên image được.
-IMAGE="${IMAGE:-ghcr.io/muakey-eco/inventory}"
+# Registry nội bộ của Muakey (Bizfly CR). Cụm k3s kéo cùng image này dưới bí danh `muakey/inventory`,
+# node tự ánh xạ sang đây (ADR 0001 của muakey-eco/k3s-ops). Source vẫn ở repo cá nhân, nên nhãn
+# source không suy ra từ tên image được.
+IMAGE="${IMAGE:-cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory}"
 SOURCE_REPO="${SOURCE_REPO:-nghianb/inventory}"
 
 cd "$(dirname "$0")/.."
@@ -35,7 +36,8 @@ docker push "${IMAGE}:latest"
 
 cat <<EOF
 
-Xong. Trên k3s: đổi tag thành ${tag} trong muakey-eco/k3s-ops, Argo CD tự đồng bộ.
+Xong. Trên k3s: đổi newTag thành ${tag} ở applications/inventory/kustomization.yaml của
+muakey-eco/k3s-ops rồi push, Argo CD tự đồng bộ.
 Trên VPS:
 
     INVENTORY_IMAGE=${IMAGE}:${tag} docker compose -f compose.prod.yaml up -d --wait

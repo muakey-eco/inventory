@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\DB;
  *   không bao giờ giữ song song hai hash, nên nhập hàng tạm dừng chừng nào còn bản ghi ở phiên bản
  *   cũ ({@see hasStaleDedupeHashes()}), còn xuất kho vẫn chạy vì Thứ tự xuất không đọc Khoá chống
  *   trùng. Lý do chọn cách này ở ADR 0003.
- * - **Backup**: chỉ đăng ký dấu vân tay phiên bản mới; dữ liệu trong app không đổi.
  *
  * Lệnh chạy lại được sau khi bị ngắt: mỗi bản ghi mang phiên bản khoá đã dùng, nên lần chạy sau
  * chỉ làm nốt phần còn lại.
@@ -73,7 +72,6 @@ final class KeyRotation
         $rewritten = match ($purpose) {
             KeyPurpose::Content => $this->reencryptContent($key),
             KeyPurpose::Hmac => $this->recomputeDedupeHashes($key),
-            KeyPurpose::Backup => 0,
         };
 
         $finishedAt = CarbonImmutable::now();
@@ -112,14 +110,11 @@ final class KeyRotation
     }
 
     /**
-     * Còn bản ghi nào chưa theo phiên bản khoá này không. Khoá backup không đụng tới dữ liệu trong
-     * app nên không bao giờ có.
+     * Còn bản ghi nào chưa theo phiên bản khoá này không.
      */
     private static function hasStaleUnits(VersionedKey $key): bool
     {
-        $column = $key->purpose->versionColumn();
-
-        return $column !== null && DB::table('stock_units')->where($column, '<>', $key->version)->exists();
+        return DB::table('stock_units')->where($key->purpose->versionColumn(), '<>', $key->version)->exists();
     }
 
     /**
@@ -127,7 +122,7 @@ final class KeyRotation
      */
     private function reencryptContent(VersionedKey $key): int
     {
-        $column = (string) $key->purpose->versionColumn();
+        $column = $key->purpose->versionColumn();
 
         return $this->rewriteStaleUnits($column, $key->version, function (array $ids) use ($key, $column): int {
             $units = DB::table('stock_units')
@@ -158,7 +153,7 @@ final class KeyRotation
      */
     private function recomputeDedupeHashes(VersionedKey $key): int
     {
-        $column = (string) $key->purpose->versionColumn();
+        $column = $key->purpose->versionColumn();
 
         return $this->rewriteStaleUnits($column, $key->version, function (array $ids) use ($key, $column): int {
             $units = StockUnit::query()

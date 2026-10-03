@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose build
 docker compose run --rm app composer install
 docker compose run --rm app php artisan key:generate
-for k in CONTENT HMAC BACKUP; do
+for k in CONTENT HMAC; do
   sed -i "s|^INVENTORY_${k}_KEY=.*|INVENTORY_${k}_KEY=1:base64:$(openssl rand -base64 32)|" .env
 done
 docker compose run --rm app php artisan migrate --seed
@@ -166,13 +166,14 @@ Việc tay, làm một lần, cần người có quyền trên từng hệ thố
    | Khoá | Giá trị |
    |---|---|
    | `APP_KEY` | `echo "base64:$(openssl rand -base64 32)"` |
-   | `INVENTORY_CONTENT_KEY`, `INVENTORY_HMAC_KEY`, `INVENTORY_BACKUP_KEY` | mỗi khoá một lần `echo "1:base64:$(openssl rand -base64 32)"` |
+   | `INVENTORY_CONTENT_KEY`, `INVENTORY_HMAC_KEY` | mỗi khoá một lần `echo "1:base64:$(openssl rand -base64 32)"` |
    | `INVENTORY_CONTENT_PREVIOUS_KEYS` | rỗng |
+   | `INVENTORY_BACKUP_KEY` | rỗng: khoá đã bỏ, app không đọc nữa, chỉ còn vì `externalsecret.yaml` chưa gỡ (xem [Khoá mã hoá](#khoá-mã-hoá)) |
    | `DB_PASSWORD` | mật khẩu ở bước 1 |
    | `AUTHENTIK_CLIENT_SECRET`, `AUTHENTIK_API_TOKEN` | từ bước 3 |
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | access key của versitygw, quyền đọc ghi bucket `muakey-inventory` |
 
-   Ba khoá `INVENTORY_*_KEY` cần một bản sao ngoài Infisical, tách khỏi backup Postgres và bucket (ADR 0001, 0010): mất khoá nội dung là mất toàn bộ hàng.
+   Hai khoá `INVENTORY_*_KEY` cần một bản sao ngoài Infisical, tách khỏi backup Postgres và bucket (ADR 0001, 0010): mất khoá nội dung là mất toàn bộ hàng.
 
 5. **Image**: `docker/build-prod.sh`, rồi đặt tag nó in ra vào `newTag` trong k3s-ops và push lên `main`.
 
@@ -205,19 +206,20 @@ Mỗi loại một thư mục trong bucket: `batch-lines/` và `batch-rejected/`
 
 ### Những gì production chưa lo
 
-- **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. `INVENTORY_BACKUP_KEY` hiện mới chỉ đăng ký dấu vân tay, **chưa mã hoá bản backup nào**. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
+- **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
 - **TLS, tên miền, chứng chỉ**: của ingress trong k3s-ops.
 
 ## Khoá mã hoá
 
-Khoá nội dung, khoá HMAC và khoá backup nằm trên Infisical (`.env` ở dev), tách khỏi `APP_KEY` (xem ADR 0001, ADR 0010). Mỗi khoá có phiên bản; DB chỉ lưu dấu vân tay của khoá, không lưu giá trị. Giữ bản sao khoá ngoài server, tách khỏi backup: mất khoá nội dung là mất toàn bộ hàng.
+Khoá nội dung và khoá HMAC nằm trên Infisical (`.env` ở dev), tách khỏi `APP_KEY` (xem ADR 0001, ADR 0010). Mỗi khoá có phiên bản; DB chỉ lưu dấu vân tay của khoá, không lưu giá trị. Giữ bản sao khoá ngoài server, tách khỏi backup: mất khoá nội dung là mất toàn bộ hàng.
 
 - `php artisan inventory:keys:register`: đăng ký dấu vân tay các khoá mới (lần đầu, hoặc khi thêm phiên bản). Không ghi đè dấu vân tay đã có; ghi Nhật ký bảo mật.
 - `php artisan inventory:keys:verify`: chạy trước khi web server khởi động; queue worker cũng tự kiểm tra khi khởi động. Khoá không khớp thì từ chối chạy.
-- `php artisan inventory:keys:rotate <content|hmac|backup>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa khoá trên Infisical trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`), cho pod nhận secret mới như ở [Chạy trên k3s](#chạy-trên-k3s), rồi chạy lệnh **ngay** qua `kubectl -n inventory exec deploy/app --`: từ lúc pod nhận khoá mới tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
+- `php artisan inventory:keys:rotate <content|hmac>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa khoá trên Infisical trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`), cho pod nhận secret mới như ở [Chạy trên k3s](#chạy-trên-k3s), rồi chạy lệnh **ngay** qua `kubectl -n inventory exec deploy/app --`: từ lúc pod nhận khoá mới tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
   - `content`: mã hoá lại từng chunk 500 Đơn vị hàng (`secret_key_version` trên bản ghi cho biết còn ai ở khoá cũ). Kho chạy bình thường suốt lúc chạy vì bản ghi chưa mã hoá lại vẫn đọc được bằng khoá cũ. Giữ khoá cũ trong `INVENTORY_CONTENT_PREVIOUS_KEYS` thêm ít nhất `INVENTORY_INTAKE_PENDING_TTL_HOURS` giờ: nội dung Lô nhập chờ xác nhận nằm trên disk còn mã hoá bằng khoá đó.
   - `hmac`: tính lại `stock_units.dedupe_hash` từ chính nội dung hàng, không cần khoá HMAC cũ. Nhập hàng tạm dừng chừng nào còn Đơn vị hàng ở `dedupe_hmac_version` cũ (kho không giữ song song hai hash), xuất kho vẫn chạy vì Thứ tự xuất không đọc Khoá chống trùng; tra cứu theo Khoá chống trùng không tìm thấy trong lúc lệnh chạy dở. Xem ADR 0003.
-  - `backup`: chỉ thêm dấu vân tay phiên bản mới, không đụng dữ liệu trong app; backup cũ vẫn cần khoá cũ.
+
+Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì nên đã bỏ. Dấu vân tay `backup` đã đăng ký vẫn nằm trong DB vì bảng chỉ-ghi-thêm, và app bỏ qua chúng. Gỡ khoá khỏi production ở **release sau** release bỏ khoá: tới lúc đó, rollback về bản còn đọc khoá vẫn phải chạy được, mà bản ấy thiếu khoá backup thì `inventory:keys:verify` thất bại và mọi tiến trình ghi từ chối chạy. Khi gỡ, bỏ `INVENTORY_BACKUP_KEY` khỏi `externalsecret.yaml` trong k3s-ops trước, rồi mới xoá trên Infisical: xoá trên Infisical trước thì Secret không được tạo và không pod nào chạy.
 
 ## Nhập hàng
 

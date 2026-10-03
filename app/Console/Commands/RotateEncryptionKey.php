@@ -17,7 +17,7 @@ use Illuminate\Console\Command;
  * bản khoá mới vào `.env` (khoá nội dung: chuyển khoá cũ sang `INVENTORY_CONTENT_PREVIOUS_KEYS`).
  * Không có nút tương ứng trong Filament (ADR 0001).
  */
-#[Signature('inventory:keys:rotate {purpose : Loại khoá cần xoay: content, hmac hoặc backup}')]
+#[Signature('inventory:keys:rotate {purpose : Loại khoá cần xoay: content hoặc hmac}')]
 #[Description('Xoay một khoá mã hoá của kho sang phiên bản mới đang cấu hình trong môi trường')]
 class RotateEncryptionKey extends Command
 {
@@ -78,9 +78,6 @@ class RotateEncryptionKey extends Command
             KeyPurpose::Hmac => [
                 sprintf('Đã tính lại Khoá chống trùng của %d Đơn vị hàng; nhập hàng đã chạy lại.', $summary->rewritten),
                 'Khoá HMAC không giữ khoá cũ: bỏ hẳn giá trị cũ khỏi .env.',
-            ],
-            KeyPurpose::Backup => [
-                'Bản backup mới dùng khoá mới; backup cũ vẫn cần khoá cũ, nên giữ khoá cũ tới khi bản backup cuối cùng dùng nó hết hạn lưu.',
             ],
         };
     }

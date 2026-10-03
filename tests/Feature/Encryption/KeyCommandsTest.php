@@ -15,7 +15,7 @@ it('đăng ký dấu vân tay các khoá từ server rồi kiểm tra thành cô
 
     $this->artisan('inventory:keys:verify')->assertSuccessful();
 
-    expect(SecurityLogEntry::count())->toBe(4);
+    expect(SecurityLogEntry::count())->toBe(3);
 });
 
 it('lệnh kiểm tra thất bại và nêu rõ khoá nào sai', function () {

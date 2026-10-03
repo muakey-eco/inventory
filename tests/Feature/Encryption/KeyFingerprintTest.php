@@ -18,7 +18,6 @@ it('chấp nhận các khoá có dấu vân tay khớp với DB và ghi Nhật k
         ['purpose' => 'content', 'version' => 2],
         ['purpose' => 'content', 'version' => 1],
         ['purpose' => 'hmac', 'version' => 1],
-        ['purpose' => 'backup', 'version' => 1],
     ])->and(SecurityLogEntry::pluck('event')->unique()->all())->toBe([SecurityEvent::KeyFingerprintRegistered])
         ->and(SecurityLogEntry::pluck('details')->toJson())->not->toContain('base64');
 });
@@ -35,8 +34,22 @@ it('từ chối khoá sai dù cùng phiên bản, thông báo rõ khoá nào và
         });
 })->with([
     'khoá HMAC' => ['hmac', 'khoá mã hoá HMAC'],
-    'khoá backup' => ['backup', 'khoá mã hoá backup'],
 ]);
+
+it('bỏ qua dấu vân tay khoá backup do bản cũ đăng ký, vì kho không còn khoá backup', function () {
+    app(KeyFingerprints::class)->register();
+    DB::table('encryption_key_fingerprints')->insert([
+        'purpose' => 'backup',
+        'version' => 1,
+        'fingerprint' => str_repeat('0', 64),
+        'registered_at' => now(),
+    ]);
+    config(['inventory.keys.backup' => null]);
+
+    app(KeyFingerprints::class)->verify();
+
+    expect(DB::table('encryption_key_fingerprints')->where('purpose', 'backup')->count())->toBe(1);
+});
 
 it('từ chối khoá nội dung cũ bị thay bằng khoá khác', function () {
     app(KeyFingerprints::class)->register();
@@ -76,7 +89,7 @@ it('không ghi đè dấu vân tay đã đăng ký bằng khoá khác cùng phi�
     config(['inventory.keys.hmac' => $original]);
 
     app(KeyFingerprints::class)->verify();
-    expect(SecurityLogEntry::count())->toBe(4);
+    expect(SecurityLogEntry::count())->toBe(3);
 });
 
 it('PostgreSQL chặn sửa, xoá và truncate dấu vân tay đã đăng ký', function (string $sql) {

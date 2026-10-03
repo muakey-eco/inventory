@@ -19,7 +19,6 @@ return [
             explode(',', (string) env('INVENTORY_CONTENT_PREVIOUS_KEYS', ''))
         )),
         'hmac' => env('INVENTORY_HMAC_KEY'),
-        'backup' => env('INVENTORY_BACKUP_KEY'),
     ],
 
     /*

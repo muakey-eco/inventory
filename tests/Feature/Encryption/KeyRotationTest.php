@@ -45,8 +45,6 @@ const CONTENT_V2 = '2:base64:BCVd/gqwBoC1GS5+NwvO8g6FCqUkcbvfamTBkhqbH1M=';
 
 const HMAC_V2 = '2:base64:+aDuV69xpMmq8HrVKo6jtB43YKS+Sd8UDwlDy4k5kgk=';
 
-const BACKUP_V2 = '2:base64:T5GFObgdym7AKwyt0v4qsJVASSLQFeWrTM9NT+Vr9Zw=';
-
 beforeEach(function () {
     Storage::fake('intake');
     $this->seed(RoleSeeder::class);
@@ -198,18 +196,12 @@ it('tính lại được Khoá chống trùng của Sản phẩm có trường k
     expect(app(DedupeLookup::class)->matchingUnits('SERIAL-9001')?->pluck('product_id')->all())->toBe([$viettel->id]);
 });
 
-it('xoay khoá backup: chỉ thêm dấu vân tay phiên bản mới, không đụng tới dữ liệu trong kho', function () {
-    $before = StockUnit::orderBy('id')->get(['dedupe_hash', 'secret_ciphertext', 'secret_key_version'])->toArray();
+it('không còn xoay khoá backup: lệnh từ chối và chỉ ra các loại khoá còn lại', function () {
+    $this->artisan('inventory:keys:rotate backup')
+        ->expectsOutputToContain('content, hmac')
+        ->assertFailed();
 
-    config(['inventory.keys.backup' => BACKUP_V2]);
-
-    $this->artisan('inventory:keys:rotate backup')->assertSuccessful();
-
-    expect(StockUnit::orderBy('id')->get(['dedupe_hash', 'secret_ciphertext', 'secret_key_version'])->toArray())->toBe($before)
-        ->and(DB::table('encryption_key_fingerprints')->where('purpose', 'backup')->orderBy('version')->pluck('version')->all())->toBe([1, 2])
-        ->and(SecurityLogEntry::query()->where('event', SecurityEvent::KeyRotationFinished)->value('details'))
-        ->toMatchArray(['purpose' => 'backup', 'from_version' => 1, 'to_version' => 2, 'rewritten' => 0])
-        ->and(SecurityLogEntry::pluck('details')->toJson())->not->toContain('T5GFObgd');
+    expect(SecurityLogEntry::query()->where('event', SecurityEvent::KeyRotationStarted)->exists())->toBeFalse();
 });
 
 it('lệnh chạy lại được sau khi bị ngắt giữa chừng: chỉ làm nốt phần còn lại', function () {

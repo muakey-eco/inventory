@@ -36,12 +36,9 @@ docker push "${IMAGE}:latest"
 
 cat <<EOF
 
-Xong. Trên k3s: đổi newTag thành ${tag} ở applications/inventory/kustomization.yaml của
+Xong. Đổi newTag thành ${tag} ở applications/inventory/kustomization.yaml của
 muakey-eco/k3s-ops rồi push, Argo CD tự đồng bộ.
-Trên VPS:
 
-    INVENTORY_IMAGE=${IMAGE}:${tag} docker compose -f compose.prod.yaml up -d --wait
-
-Rollback: đặt lại tag cũ ở k3s-ops, hoặc chạy lại lệnh trên VPS với tag cũ. Migration theo
-expand/contract (AGENTS.md) nên chỉ lùi an toàn được một release.
+Rollback: đặt lại tag cũ ở k3s-ops. Migration theo expand/contract (AGENTS.md) nên chỉ lùi
+an toàn được một release.
 EOF

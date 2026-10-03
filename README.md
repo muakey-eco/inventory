@@ -2,7 +2,7 @@
 
 Hệ thống quản lý kho nội bộ cho shop bán hàng số. Thuật ngữ nghiệp vụ nằm trong [`CONTEXT.md`](CONTEXT.md), quyết định kiến trúc trong [`docs/adr/`](docs/adr/).
 
-Nền tảng: Laravel 13, Filament 5, PostgreSQL 17, Pest. Chạy bằng Docker Compose với FrankenPHP (PHP 8.4): [`compose.yaml`](compose.yaml) cho dev, [`compose.prod.yaml`](compose.prod.yaml) cho production.
+Nền tảng: Laravel 13, Filament 5, PostgreSQL 17, Pest. Chạy bằng FrankenPHP (PHP 8.4): dev dùng Docker Compose ([`compose.yaml`](compose.yaml)), production chạy trên k3s (xem [Triển khai production](#triển-khai-production)).
 
 ## Chạy lần đầu
 
@@ -66,37 +66,7 @@ Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev serv
 
 ## Triển khai production
 
-Một VPS, sau một reverse proxy **cùng máy đã cầm TLS** (xem [ADR 0005](docs/adr/0005-kho-chay-tren-mot-node.md)). Image build thủ công trên máy dev rồi đẩy lên Registry nội bộ (Bizfly Container Registry của Muakey); VPS chỉ kéo image về, không cần source, không cần Composer hay Node.
-
-### Yêu cầu với reverse proxy
-
-FrankenPHP chỉ nghe `127.0.0.1:8000`, không mở ra Internet. Proxy phải chuyển tiếp tới đó, **kèm `X-Forwarded-Proto: https` và `X-Forwarded-For`**. Thiếu header đầu thì Laravel tưởng mình chạy trên `http` và sinh URL sai scheme: trình duyệt chặn asset và panel Filament vỡ giao diện.
-
-### Chuẩn bị VPS (một lần)
-
-```bash
-mkdir -p /srv/inventory
-# chép docker/prod/app.env.example và compose.prod.yaml từ repo sang /srv/inventory/
-vi /srv/inventory/app.env        # điền APP_KEY, ba khoá INVENTORY_*, mật khẩu DB, APP_URL, AUTHENTIK_*
-chmod 600 /srv/inventory/app.env
-docker login cr-hn-1.bizflycloud.vn   # image nằm ở Registry nội bộ, private
-```
-
-Khoá sinh như ở phần Chạy lần đầu (`openssl rand -base64 32`, dạng `1:base64:…`). `DB_*` và `POSTGRES_*` trong file đó phải khớp từng cặp.
-
-### Lần dựng đầu trên VPS trắng
-
-`migrate` tự chạy mỗi lần deploy, nhưng dấu vân tay khoá và Vai trò thì không — và service `app` từ chối khởi động khi khoá chưa đăng ký, nên các lệnh này phải chạy **trước** lần `up` đầu tiên:
-
-```bash
-cd /srv/inventory
-export INVENTORY_IMAGE=cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory:git-<sha>
-docker compose -f compose.prod.yaml run --rm migrate
-docker compose -f compose.prod.yaml run --rm --no-deps app php artisan inventory:keys:register
-docker compose -f compose.prod.yaml run --rm --no-deps app php artisan db:seed --class=RoleSeeder --force
-```
-
-Kho không có lệnh tạo Quản trị đầu tiên: Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho-quan-tri` đăng nhập qua Authentik.
+Production chạy trên cụm k3s dùng chung của tổ chức ([ADR 0009](docs/adr/0009-kho-chay-tren-k3s-nhieu-replica.md)), xem [Chạy trên k3s](#chạy-trên-k3s). Repo không còn stack Compose cho production: `compose.yaml` chỉ dành cho dev. Image build thủ công trên máy dev bằng `docker/build-prod.sh` rồi đẩy lên Registry nội bộ (Bizfly Container Registry của Muakey).
 
 ### Đăng nhập qua Authentik
 
@@ -120,13 +90,7 @@ Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò*
 4. **Application** gắn provider trên, kèm policy/binding chỉ cho thành viên ba group `kho-*` vào.
 5. **Flow** xác thực của Application phải bắt MFA (stage Authenticator Validation, không để "skip" khi người dùng chưa có thiết bị). Kho không chặn theo `amr`, chỉ ghi Nhật ký bảo mật "Đăng nhập thiếu bằng chứng MFA" khi `amr` thiếu `mfa` (Authentik bỏ `mfa` cả khi stage MFA được bỏ qua nhờ cookie).
 
-Rồi điền vào `app.env`:
-
-```bash
-AUTHENTIK_ISSUER=https://auth.example.com/application/o/<slug-của-application>/
-AUTHENTIK_CLIENT_ID=
-AUTHENTIK_CLIENT_SECRET=
-```
+Rồi đặt `AUTHENTIK_ISSUER` (`https://auth.example.com/application/o/<slug-của-application>/`, có dấu `/` cuối) và `AUTHENTIK_CLIENT_ID` trong `config.env` của k3s-ops, còn `AUTHENTIK_CLIENT_SECRET` trên Infisical (xem [Dựng lần đầu trên k3s](#dựng-lần-đầu-trên-k3s)).
 
 Đăng xuất ở kho chỉ huỷ phiên kho, không đụng phiên Authentik. Mọi lần từ chối (không có Vai trò, bị Khoá nhân viên, state/nonce sai, Authentik báo lỗi) dừng ở một trang tĩnh có nút Thử lại, không tự chuyển hướng.
 
@@ -140,13 +104,9 @@ Cấu hình một lần trên Authentik:
 
 1. **Service account** (Directory → Users → Create Service Account), ví dụ `kho-sync`. Bỏ chọn tạo token có hạn.
 2. **Role** (Directory → Roles) có hai quyền `authentik_core.view_user` (Can view User) và `authentik_core.view_group` (Can view Group), gán cho service account (trực tiếp, hoặc qua một group chỉ chứa nó). Không cấp quyền ghi nào.
-3. **Token** (Directory → Tokens and App passwords → Create) cho service account: Intent **API Token**, **bỏ Expiring**. Token có hạn bị Authentik tự xoay giá trị khi hết hạn, kho sẽ mất kết nối mà không ai đổi `.env`.
+3. **Token** (Directory → Tokens and App passwords → Create) cho service account: Intent **API Token**, **bỏ Expiring**. Token có hạn bị Authentik tự xoay giá trị khi hết hạn, kho sẽ mất kết nối mà không ai đổi secret.
 
-Rồi điền vào `app.env`:
-
-```bash
-AUTHENTIK_API_TOKEN=
-```
+Rồi đặt token vào `AUTHENTIK_API_TOKEN` trên Infisical.
 
 ### Back-channel logout từ Authentik
 
@@ -158,23 +118,6 @@ Cấu hình trên **Provider** ở mục Đăng nhập (Advanced protocol settin
 - **Logout Method**: **Back-channel**.
 
 Không cần thêm biến môi trường: kho dùng lại `AUTHENTIK_ISSUER` và `AUTHENTIK_CLIENT_ID`.
-
-### Deploy
-
-Trên máy dev, từ một commit đã sạch (script từ chối chạy nếu cây làm việc còn thay đổi chưa commit):
-
-```bash
-docker/build-prod.sh
-```
-
-Trên VPS:
-
-```bash
-cd /srv/inventory
-INVENTORY_IMAGE=cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory:git-<sha> docker compose -f compose.prod.yaml up -d --wait
-```
-
-Service `migrate` chạy `migrate --force` đúng một lần rồi mới tới `app`, `queue`, `scheduler`, nên không có chuyện ba tiến trình đua nhau một migration. Deploy gián đoạn 15–60 giây. **Rollback** là chạy lại đúng lệnh trên với tag cũ — vì vậy đừng deploy bằng `:latest`.
 
 ### Chạy trên k3s
 
@@ -256,22 +199,22 @@ Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho
 
 ### File trên S3-compatible (k3s)
 
-Trên k3s pod không giữ state cục bộ (ADR 0009): nội dung Lô nhập chờ xác nhận, ảnh Báo lỗi và upload tạm Livewire nằm trên bucket S3-compatible (versitygw tại `https://s3.muakey.com`, bucket `muakey-inventory`), qua disk `s3`. Đặt `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET`, `AWS_ENDPOINT`, `AWS_USE_PATH_STYLE_ENDPOINT=true`, rồi `INVENTORY_INTAKE_DISK=s3`, `INVENTORY_DEFECT_SCREENSHOT_DISK=s3`, `LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK=s3`. Không đặt ba biến cuối thì kho dùng ổ local như stack VPS ở trên, và dev cùng test chạy như cũ.
+Trên k3s pod không giữ state cục bộ (ADR 0009): nội dung Lô nhập chờ xác nhận, ảnh Báo lỗi và upload tạm Livewire nằm trên bucket S3-compatible (versitygw tại `https://s3.muakey.com`, bucket `muakey-inventory`), qua disk `s3`. Đặt `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET`, `AWS_ENDPOINT`, `AWS_USE_PATH_STYLE_ENDPOINT=true`, rồi `INVENTORY_INTAKE_DISK=s3`, `INVENTORY_DEFECT_SCREENSHOT_DISK=s3`, `LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK=s3`. Không đặt ba biến cuối thì kho dùng ổ local, như dev và test.
 
 Mỗi loại một thư mục trong bucket: `batch-lines/` và `batch-rejected/` (mã hoá), `defect-reports/`, `livewire-tmp/`. Upload tạm đi thẳng từ trình duyệt lên bucket bằng URL ký sẵn, nên bucket phải cho CORS `PUT` từ origin của panel. File trong `livewire-tmp/` là **bản rõ** tới khi `inventory:intake:purge` xoá (ADR 0010). Lệnh purge đọc thời điểm ghi từ một lần liệt kê thư mục, không gửi HEAD cho từng file.
 
-### Những gì stack này không lo
+### Những gì production chưa lo
 
-- **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket khi chạy trên k3s, hoặc ở `storage/app/private/defect-reports` trong volume `app-storage` khi chạy disk local. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. `INVENTORY_BACKUP_KEY` hiện mới chỉ đăng ký dấu vân tay, **chưa mã hoá bản backup nào**. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
-- **TLS, tên miền, chứng chỉ**: của reverse proxy.
+- **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. `INVENTORY_BACKUP_KEY` hiện mới chỉ đăng ký dấu vân tay, **chưa mã hoá bản backup nào**. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
+- **TLS, tên miền, chứng chỉ**: của ingress trong k3s-ops.
 
 ## Khoá mã hoá
 
-Khoá nội dung, khoá HMAC và khoá backup nằm trong `.env`, tách khỏi `APP_KEY` (xem ADR 0001). Mỗi khoá có phiên bản; DB chỉ lưu dấu vân tay của khoá, không lưu giá trị. Giữ bản sao khoá ngoài server, tách khỏi backup: mất khoá nội dung là mất toàn bộ hàng.
+Khoá nội dung, khoá HMAC và khoá backup nằm trên Infisical (`.env` ở dev), tách khỏi `APP_KEY` (xem ADR 0001, ADR 0010). Mỗi khoá có phiên bản; DB chỉ lưu dấu vân tay của khoá, không lưu giá trị. Giữ bản sao khoá ngoài server, tách khỏi backup: mất khoá nội dung là mất toàn bộ hàng.
 
 - `php artisan inventory:keys:register`: đăng ký dấu vân tay các khoá mới (lần đầu, hoặc khi thêm phiên bản). Không ghi đè dấu vân tay đã có; ghi Nhật ký bảo mật.
 - `php artisan inventory:keys:verify`: chạy trước khi web server khởi động; queue worker cũng tự kiểm tra khi khởi động. Khoá không khớp thì từ chối chạy.
-- `php artisan inventory:keys:rotate <content|hmac|backup>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa `.env` trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`) rồi chạy lệnh **ngay**: từ lúc `.env` đổi tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
+- `php artisan inventory:keys:rotate <content|hmac|backup>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa khoá trên Infisical trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`), cho pod nhận secret mới như ở [Chạy trên k3s](#chạy-trên-k3s), rồi chạy lệnh **ngay** qua `kubectl -n inventory exec deploy/app --`: từ lúc pod nhận khoá mới tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
   - `content`: mã hoá lại từng chunk 500 Đơn vị hàng (`secret_key_version` trên bản ghi cho biết còn ai ở khoá cũ). Kho chạy bình thường suốt lúc chạy vì bản ghi chưa mã hoá lại vẫn đọc được bằng khoá cũ. Giữ khoá cũ trong `INVENTORY_CONTENT_PREVIOUS_KEYS` thêm ít nhất `INVENTORY_INTAKE_PENDING_TTL_HOURS` giờ: nội dung Lô nhập chờ xác nhận nằm trên disk còn mã hoá bằng khoá đó.
   - `hmac`: tính lại `stock_units.dedupe_hash` từ chính nội dung hàng, không cần khoá HMAC cũ. Nhập hàng tạm dừng chừng nào còn Đơn vị hàng ở `dedupe_hmac_version` cũ (kho không giữ song song hai hash), xuất kho vẫn chạy vì Thứ tự xuất không đọc Khoá chống trùng; tra cứu theo Khoá chống trùng không tìm thấy trong lúc lệnh chạy dở. Xem ADR 0003.
   - `backup`: chỉ thêm dấu vân tay phiên bản mới, không đụng dữ liệu trong app; backup cũ vẫn cần khoá cũ.
@@ -411,7 +354,7 @@ Khoá nội dung, khoá HMAC và khoá backup nằm trong `.env`, tách khỏi `
 Khi Quản trị bị Khoá nhân viên mà không còn Quản trị nào khác mở được, người vận hành server chạy:
 
 ```bash
-docker compose run --rm app php artisan staff:recover-owner chu@shop.test --unlock
+kubectl -n inventory exec deploy/app -- php artisan staff:recover-owner chu@shop.test --unlock
 ```
 
 Chỉ áp dụng cho nhân viên mang Vai trò Quản trị; mỗi lần ghi Nhật ký bảo mật. Mất thiết bị MFA hay quên mật khẩu thì xử lý trên Authentik, không phải ở kho.

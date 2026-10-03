@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Nhân viên đăng nhập qua Authentik (ADR 0008): bỏ mật khẩu và TOTP của kho, nhận diện bằng
- * `sub` của Authentik. Kho chưa chạy production nên không backfill.
+ * `sub` của Authentik. Lúc viết, kho chưa chạy production nên không backfill.
  */
 return new class extends Migration
 {

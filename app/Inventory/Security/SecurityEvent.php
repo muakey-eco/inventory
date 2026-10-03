@@ -4,7 +4,7 @@ namespace App\Inventory\Security;
 
 /**
  * Loại sự kiện ghi vào Nhật ký bảo mật. Các sự kiện của đường mật khẩu + TOTP cũ đã xoá hẳn
- * cùng đường đó (ADR 0008): kho chưa chạy production nên không có dòng cũ nào phải đọc lại.
+ * cùng đường đó (ADR 0008): lúc xoá, kho chưa chạy production nên không có dòng cũ nào phải đọc lại.
  */
 enum SecurityEvent: string
 {

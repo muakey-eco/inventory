@@ -36,7 +36,7 @@ it('từ chối khoá sai dù cùng phiên bản, thông báo rõ khoá nào và
     'khoá HMAC' => ['hmac', 'khoá mã hoá HMAC'],
 ]);
 
-it('bỏ qua dấu vân tay khoá backup do bản cũ đăng ký, vì kho không còn khoá backup', function () {
+it('bỏ qua dấu vân tay khoá backup do bản cũ đăng ký, kể cả khi khoá vẫn còn trong môi trường', function () {
     app(KeyFingerprints::class)->register();
     DB::table('encryption_key_fingerprints')->insert([
         'purpose' => 'backup',
@@ -44,7 +44,7 @@ it('bỏ qua dấu vân tay khoá backup do bản cũ đăng ký, vì kho không
         'fingerprint' => str_repeat('0', 64),
         'registered_at' => now(),
     ]);
-    config(['inventory.keys.backup' => null]);
+    config(['inventory.keys.backup' => OTHER_KEY]);
 
     app(KeyFingerprints::class)->verify();
 

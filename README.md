@@ -161,13 +161,14 @@ Việc tay, làm một lần, cần người có quyền trên từng hệ thố
 
    Client ID là cấu hình, không phải bí mật: ghi vào `AUTHENTIK_CLIENT_ID` trong `applications/inventory/config.env` của k3s-ops. Tới lúc đó pod vẫn chạy, chỉ đăng nhập là hỏng.
 
-4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ chín khoá mà `externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
+4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ mười khoá mà `externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
 
    | Khoá | Giá trị |
    |---|---|
    | `APP_KEY` | `echo "base64:$(openssl rand -base64 32)"` |
    | `INVENTORY_CONTENT_KEY`, `INVENTORY_HMAC_KEY` | mỗi khoá một lần `echo "1:base64:$(openssl rand -base64 32)"` |
    | `INVENTORY_CONTENT_PREVIOUS_KEYS` | rỗng |
+   | `INVENTORY_BACKUP_KEY` | rỗng: khoá đã bỏ, app không đọc nữa, chỉ còn vì `externalsecret.yaml` chưa gỡ (xem [Khoá mã hoá](#khoá-mã-hoá)) |
    | `DB_PASSWORD` | mật khẩu ở bước 1 |
    | `AUTHENTIK_CLIENT_SECRET`, `AUTHENTIK_API_TOKEN` | từ bước 3 |
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | access key của versitygw, quyền đọc ghi bucket `muakey-inventory` |
@@ -218,7 +219,7 @@ Khoá nội dung và khoá HMAC nằm trên Infisical (`.env` ở dev), tách kh
   - `content`: mã hoá lại từng chunk 500 Đơn vị hàng (`secret_key_version` trên bản ghi cho biết còn ai ở khoá cũ). Kho chạy bình thường suốt lúc chạy vì bản ghi chưa mã hoá lại vẫn đọc được bằng khoá cũ. Giữ khoá cũ trong `INVENTORY_CONTENT_PREVIOUS_KEYS` thêm ít nhất `INVENTORY_INTAKE_PENDING_TTL_HOURS` giờ: nội dung Lô nhập chờ xác nhận nằm trên disk còn mã hoá bằng khoá đó.
   - `hmac`: tính lại `stock_units.dedupe_hash` từ chính nội dung hàng, không cần khoá HMAC cũ. Nhập hàng tạm dừng chừng nào còn Đơn vị hàng ở `dedupe_hmac_version` cũ (kho không giữ song song hai hash), xuất kho vẫn chạy vì Thứ tự xuất không đọc Khoá chống trùng; tra cứu theo Khoá chống trùng không tìm thấy trong lúc lệnh chạy dở. Xem ADR 0003.
 
-Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì nên đã bỏ. Dấu vân tay `backup` đã đăng ký vẫn nằm trong DB vì bảng chỉ-ghi-thêm, và app bỏ qua chúng. Gỡ khoá khỏi production theo thứ tự: deploy bản bỏ khoá và chờ rolling xong (pod cũ vẫn đọc khoá), rồi bỏ `INVENTORY_BACKUP_KEY` khỏi `externalsecret.yaml` trong k3s-ops, rồi mới xoá trên Infisical. Xoá trên Infisical trước thì Secret không được tạo và không pod nào chạy.
+Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì nên đã bỏ. Dấu vân tay `backup` đã đăng ký vẫn nằm trong DB vì bảng chỉ-ghi-thêm, và app bỏ qua chúng. Gỡ khoá khỏi production ở **release sau** release bỏ khoá: tới lúc đó, rollback về bản còn đọc khoá vẫn phải chạy được, mà bản ấy thiếu khoá backup thì `inventory:keys:verify` thất bại và mọi tiến trình ghi từ chối chạy. Khi gỡ, bỏ `INVENTORY_BACKUP_KEY` khỏi `externalsecret.yaml` trong k3s-ops trước, rồi mới xoá trên Infisical: xoá trên Infisical trước thì Secret không được tạo và không pod nào chạy.
 
 ## Nhập hàng
 

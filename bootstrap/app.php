@@ -25,9 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Production chạy sau một reverse proxy cùng máy đã cầm TLS (ADR 0005). Không khai tin cậy
+        // Production chạy sau ingress-nginx của k3s, nơi cầm TLS (ADR 0009). Không khai tin cậy
         // thì Laravel thấy request là http và sinh URL sai scheme, làm panel Filament vỡ asset.
-        // `*` an toàn ở đây vì container chỉ bind 127.0.0.1: không ai ngoài máy chạm tới để giả header.
+        // `*` vì ingress chạy hostNetwork nên không có IP cố định để khai; cái giá (workload khác
+        // trong cụm giả được IP client) ADR 0009 đã chấp nhận.
         $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {

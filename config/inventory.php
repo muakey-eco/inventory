@@ -27,7 +27,7 @@ return [
     | Nhập hàng
     |--------------------------------------------------------------------------
     |
-    | Giới hạn mỗi file hoặc danh sách dán (con số tạm, chốt lại sau khi đo trên VPS).
+    | Giới hạn mỗi file hoặc danh sách dán (con số tạm, chốt lại sau khi đo trên production).
     | Nội dung chờ xác nhận nằm mã hoá trên disk `disk` (ổ local, hoặc `s3` trên k3s theo
     | ADR 0009), không vào backup DB;
     | Lô nhập chưa xác nhận quá `pending_ttl_hours` thì hết hạn và nội dung tạm bị xoá.

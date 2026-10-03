@@ -1,6 +1,6 @@
 name: inventory
 
-# Stack dev. Production nằm ở compose.prod.yaml và không dùng chung file nào với stack này:
+# Stack dev. Production chạy trên k3s (ADR 0009) và không dùng chung file nào với stack này:
 # hai môi trường chỉ chia sẻ tầng `base` của docker/php/Dockerfile.
 
 services:

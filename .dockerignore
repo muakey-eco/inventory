@@ -42,7 +42,6 @@ storage/*.key
 auth.json
 
 compose.yaml
-compose.prod.yaml
 compose.override.yaml
 
 # Không thuộc về image chạy thật. Riêng phpunit.xml còn mang sẵn khoá mã hoá dùng cho test.

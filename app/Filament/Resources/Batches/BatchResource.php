@@ -382,8 +382,7 @@ class BatchResource extends Resource
         // lên từng RepeatableEntry.
         return $schema->columns(1)->components([
             // Job pha 1 chạy ngoài request, nên màn xem tự hỏi lại cho tới khi có kết quả: nhân
-            // viên không phải tự đoán lúc nào xong mà bấm lại. Kho chạy trên một node (ADR 0005)
-            // nên polling đủ, không cần broadcast. Mỗi lần hỏi vẽ lại cả trang, nên kết quả kiểm
+            // viên không phải tự đoán lúc nào xong mà bấm lại. Polling đủ, không cần broadcast. Mỗi lần hỏi vẽ lại cả trang, nên kết quả kiểm
             // tra và các nút hiện ra ngay; ViewBatch::notifyValidationResult báo một tiếng.
             // keep-alive vì Livewire bóp nhịp còn ~5% khi tab chạy nền, mà gửi xong lô lớn thì
             // nhân viên hay chuyển tab đi làm việc khác — đúng lúc cần báo nhất.

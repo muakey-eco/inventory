@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/css/filament/admin/theme.css'],
             refresh: true,
             fonts: [
                 bunny('Instrument Sans', {
@@ -23,8 +23,17 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         origin: process.env.VITE_ORIGIN ?? 'http://localhost:5173',
+        // Origin của trang app được nạp script từ vite. Phải khai tường minh: có `origin` ở trên thì
+        // laravel-vite-plugin lấy chính nó (origin của vite) làm danh sách CORS, và trình duyệt chặn
+        // `@vite/client` khi panel nạp theme.css qua vite.
+        cors: {
+            origin: process.env.VITE_APP_ORIGIN ?? 'http://localhost:8080',
+        },
         hmr: {
             host: process.env.VITE_HMR_HOST ?? 'localhost',
+            // Cổng trình duyệt dùng để mở websocket HMR. Đổi khi cổng 5173 trên host đã bị chiếm
+            // và vite được map ra một cổng khác.
+            clientPort: Number(process.env.VITE_HMR_CLIENT_PORT ?? 5173),
         },
         watch: {
             // Vite đăng ký một inotify watch cho mỗi file. Trong container, vendor/ (hàng chục

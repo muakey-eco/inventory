@@ -1,0 +1,5 @@
+/* Sinh bởi `php artisan muakey-theme:install`: chỉ @import CSS của Theme, cộng các @source. */
+@import '../../../../vendor/muakey/filament-muakey-theme/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';

@@ -1,4 +1,6 @@
-@extends('auth.layout')
+@extends('layouts.outside-panel')
+
+@section('title', 'Đã đăng xuất')
 
 @section('content')
     <x-filament-panels::header.simple

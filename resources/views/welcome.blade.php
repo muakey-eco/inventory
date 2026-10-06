@@ -1,4 +1,4 @@
-@extends('auth.layout')
+@extends('layouts.outside-panel')
 
 @section('content')
     <x-filament-panels::header.simple subheading="Đăng nhập bằng tài khoản Authentik của bạn để vào kho." />

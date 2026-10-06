@@ -36,3 +36,8 @@ it('trang chủ dẫn vào kho', function () {
         ->assertSee(Filament::getUrl())
         ->assertDontSee('laravel.com');
 });
+
+it('mỗi trang có tiêu đề riêng trên tab', function () {
+    expect($this->get(route('filament.admin.auth.signed-out'))->getContent())
+        ->toMatch('/<title>\s*Đã đăng xuất\s*-\s*Kho hàng số\s*<\/title>/u');
+});

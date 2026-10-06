@@ -72,7 +72,7 @@ COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 
 COPY . .
-# resources/css/app.css có @source trỏ vào blade phân trang của Laravel, nên Tailwind cần vendor/.
+# theme.css của panel @import CSS nguồn của Filament và của Theme trong vendor/.
 COPY --from=vendor /app/vendor ./vendor
 RUN npm run build
 

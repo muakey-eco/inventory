@@ -43,6 +43,7 @@ it('ở local chọn một nhân viên rồi vào thẳng panel', function () {
 
     $this->get(route('filament.admin.auth.dev'))
         ->assertOk()
+        ->assertSee('fi-simple-layout', escape: false)
         ->assertSee('Bình bán hàng');
 
     // Ngoài APP_ENV=testing thì CSRF có hiệu lực thật.

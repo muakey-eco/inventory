@@ -3,3 +3,6 @@
 
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
+
+/* Trang ngoài panel (đăng nhập dev, bị từ chối, đã đăng xuất) cũng dùng layout của panel. */
+@source '../../../../resources/views/auth/**/*';

@@ -15,6 +15,11 @@ services:
         image: inventory-app:dev
         # Khoá mã hoá không khớp dấu vân tay trong DB thì không khởi động.
         command: sh -c "php artisan inventory:keys:verify && exec frankenphp run --config /etc/frankenphp/Caddyfile"
+        environment:
+            # Token GitHub để Composer đọc repo private của filament-muakey-theme. Lấy từ shell
+            # của host, không ghi vào file nào: `export COMPOSER_AUTH='{"github-oauth":
+            # {"github.com": "'"$(gh auth token)"'"}}'` trước `docker compose up`.
+            COMPOSER_AUTH: ${COMPOSER_AUTH:-}
         volumes:
             - .:/app
         ports:

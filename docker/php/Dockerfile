@@ -39,7 +39,10 @@ FROM base AS vendor
 RUN install-php-extensions @composer
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+# filament-muakey-theme nằm ở repo private. Token GitHub đi vào bằng build secret, không qua ARG
+# hay ENV, để không nằm lại trong layer của image.
+RUN --mount=type=secret,id=composer_auth,env=COMPOSER_AUTH \
+    composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
 
 COPY . .
 

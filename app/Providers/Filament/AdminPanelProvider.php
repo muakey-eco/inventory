@@ -13,7 +13,6 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -21,6 +20,8 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Muakey\FilamentTheme\MuakeyColor;
+use Muakey\FilamentTheme\MuakeyThemePlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -44,9 +45,11 @@ class AdminPanelProvider extends PanelProvider
                     Route::post('/auth/dev/{user}', [DevSignIn::class, 'store'])->name('auth.dev.store');
                 }
             })
-            ->colors([
-                'primary' => Color::Amber,
-            ])
+            // Tên app không chứa chữ "Muakey": logo mặc định của Theme đã có wordmark đó.
+            ->brandName('Kho hàng số')
+            // Theme khoá Khung (font, bảng gray, Màu ngữ nghĩa, bo góc). App chỉ chọn Màu nhấn, khác
+            // các app Muakey còn lại.
+            ->plugin(MuakeyThemePlugin::make()->primary(MuakeyColor::Geekblue))
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

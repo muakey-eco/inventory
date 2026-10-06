@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b99da5159b13445cce720532897e01ee",
+    "content-hash": "f29bc5d570ed4537d41c02d4926c068b",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -3769,6 +3769,82 @@
                 "source": "https://github.com/jmespath/jmespath.php/tree/2.9.2"
             },
             "time": "2026-07-06T18:56:19+00:00"
+        },
+        {
+            "name": "muakey/filament-muakey-theme",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:muakey-eco/filament-muakey-theme.git",
+                "reference": "e6f47f16192e49af859c6581935f4a090da5a0d9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/muakey-eco/filament-muakey-theme/zipball/e6f47f16192e49af859c6581935f4a090da5a0d9",
+                "reference": "e6f47f16192e49af859c6581935f4a090da5a0d9",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^5.8",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0|^11.0",
+                "pestphp/pest": "^4.0",
+                "pestphp/pest-plugin-laravel": "^4.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Muakey\\FilamentTheme\\MuakeyThemeServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Muakey\\FilamentTheme\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Muakey\\FilamentTheme\\Tests\\": "tests/",
+                    "Workbench\\App\\": "workbench/app/",
+                    "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+                }
+            },
+            "scripts": {
+                "post-autoload-dump": [
+                    "@clear",
+                    "@prepare"
+                ],
+                "clear": [
+                    "@php vendor/bin/testbench package:purge-skeleton --ansi"
+                ],
+                "prepare": [
+                    "@php vendor/bin/testbench package:discover --ansi"
+                ],
+                "build": [
+                    "@php vendor/bin/testbench workbench:build --ansi"
+                ],
+                "serve": [
+                    "Composer\\Config::disableProcessTimeout",
+                    "@build",
+                    "@php vendor/bin/testbench serve --ansi"
+                ],
+                "test": [
+                    "pest"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Theme Filament dùng chung cho các trang quản trị của Muakey.",
+            "support": {
+                "source": "https://github.com/muakey-eco/filament-muakey-theme/tree/v1.0.0",
+                "issues": "https://github.com/muakey-eco/filament-muakey-theme/issues"
+            },
+            "time": "2026-10-05T09:49:00+00:00"
         },
         {
             "name": "nesbot/carbon",

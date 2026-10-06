@@ -65,6 +65,8 @@ services:
             # (ví dụ qua Tailscale, xem compose.override.yaml).
             VITE_ORIGIN: ${VITE_ORIGIN:-http://localhost:5173}
             VITE_HMR_HOST: ${VITE_HMR_HOST:-localhost}
+            VITE_HMR_CLIENT_PORT: ${VITE_HMR_CLIENT_PORT:-5173}
+            VITE_APP_ORIGIN: ${VITE_APP_ORIGIN:-http://localhost:8080}
         volumes:
             - .:/app
         ports:

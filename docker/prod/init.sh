@@ -1,34 +1,25 @@
 #!/bin/sh
-# initContainer chung của mọi pod (`app`, `queue`, `scheduler`), xem ADR 0009 và mục "Chạy trên k3s"
-# của README (lần dựng đầu, gỡ khoá khi pod giữ khoá chết giữa chừng).
+# initContainer `wait-for-migrate` của mọi Deployment (`web`, `queue`, `scheduler`), xem ADR 0009 và
+# `deploy/k3s/wait-for-migrate.yaml`.
 #
-# Mọi pod cùng chạy script này một lúc. `--isolated` giữ một khoá trên cache store: pod lấy được khoá
-# chạy migrate, các pod còn lại thoát ngay với mã 0 rồi chờ ở vòng lặp bên dưới. Khoá chỉ loại trừ được
-# giữa các pod khi cache store dùng chung, nên store khác bị từ chối ở đây.
+# Script này KHÔNG migrate: chỉ Job `migrate` làm việc đó. Ở đây pod chờ tới khi database hết migration
+# pending, rồi kiểm khoá mã hoá. k8s không có quan hệ "chờ Job khác", nên pod tự hỏi chính database.
 set -eu
-
-case "${CACHE_STORE:-database}" in
-    database | redis) ;;
-    *)
-        echo "CACHE_STORE=${CACHE_STORE} không dùng chung giữa các pod: mọi pod sẽ cùng migrate." >&2
-        exit 1
-        ;;
-esac
 
 wait_seconds="${INVENTORY_MIGRATE_WAIT_SECONDS:-600}"
 
-php artisan migrate --force --isolated
-
-# `migrate:status --pending=1` thoát mã 1 khi còn migration pending.
+# `migrate:status --pending=1` thoát mã 1 khi còn migration pending, và mã khác 0 khi bảng `migrations`
+# chưa tồn tại (Job chưa chạy lần nào).
 deadline=$(( $(date +%s) + wait_seconds ))
 until status="$(php artisan migrate:status --pending=1 2>&1)"; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
-        echo "Hết ${wait_seconds} giây mà vẫn còn migration pending. Lần kiểm tra cuối:" >&2
+        echo "Hết ${wait_seconds} giây mà vẫn còn migration pending. Xem log Job \`migrate\`. Lần kiểm tra cuối:" >&2
         echo "$status" >&2
         exit 1
     fi
-    echo "Còn migration pending, chờ pod đang giữ khoá migrate xong..."
+    echo "Còn migration pending, chờ Job migrate..."
     sleep 3
 done
 
+# Lần dựng đầu thất bại ở đây cho tới khi `inventory:keys:register` chạy tay (README).
 php artisan inventory:keys:verify

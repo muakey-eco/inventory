@@ -2,7 +2,8 @@
 # Build image production và đẩy lên registry.
 #
 # Build thủ công không có CI đứng sau kiểm, nên rào chắn nằm ở đây: chỉ build từ một commit sạch,
-# và tag theo commit sha để rollback được bằng cách đổi tag.
+# và tag theo commit sha để rollback được bằng cách đổi tag. Không đẩy `latest`: Argo CD so manifest
+# chứ không so digest, nên một `latest` mới không deploy gì, chỉ gây nhầm.
 set -euo pipefail
 
 # Registry nội bộ của Muakey (Bizfly CR). Cụm k3s kéo cùng image này dưới bí danh `muakey/inventory`,
@@ -19,8 +20,7 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-sha="$(git rev-parse --short HEAD)"
-tag="git-${sha}"
+tag="$(git rev-parse --short=7 HEAD)"
 
 # Composer cần token GitHub đọc được repo private muakey-eco/filament-muakey-theme.
 if [ -z "${COMPOSER_AUTH:-}" ]; then
@@ -36,19 +36,17 @@ docker build \
     --secret id=composer_auth,env=COMPOSER_AUTH \
     --target prod \
     --tag "${IMAGE}:${tag}" \
-    --tag "${IMAGE}:latest" \
     --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
     --label "org.opencontainers.image.source=https://github.com/${SOURCE_REPO}" \
     .
 
 docker push "${IMAGE}:${tag}"
-docker push "${IMAGE}:latest"
 
 cat <<EOF
 
-Xong. Đổi newTag thành ${tag} ở applications/inventory/kustomization.yaml của
-muakey-eco/k3s-ops rồi push, Argo CD tự đồng bộ.
+Xong. Đặt newTag: "${tag}" ở deploy/k3s/kustomization.yaml, commit lên master, rồi chép nguyên
+thư mục deploy/k3s/ sang applications/inventory/ của muakey-eco/k3s-ops. Argo CD tự đồng bộ.
 
-Rollback: đặt lại tag cũ ở k3s-ops. Migration theo expand/contract (AGENTS.md) nên chỉ lùi
-an toàn được một release.
+Rollback: đặt lại SHA cũ ở deploy/k3s/kustomization.yaml rồi chép lại. Migration theo
+expand/contract (AGENTS.md) nên chỉ lùi an toàn được một release.
 EOF

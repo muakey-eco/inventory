@@ -1,0 +1,10 @@
+# Drain một node không được rút cả hai pod `web` cùng lúc.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web

@@ -1,0 +1,35 @@
+# Lịch ở `routes/console.php`: release-holds và staff:sync mỗi phút, hai lệnh
+# purge mỗi giờ.
+#
+# ĐÚNG MỘT bản, `Recreate`: rolling update dựng pod MỚI trước khi giết pod cũ,
+# tức hai scheduler sống cùng lúc. Lịch không dùng `onOneServer()` nên ràng buộc
+# này là thứ duy nhất ngăn nhả giữ chỗ hai lần (ADR 0009). Lỡ một phút lúc
+# rollout không sao.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  labels:
+    inventory/image: app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scheduler
+    spec:
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: inventory
+          args: ["php", "artisan", "schedule:work"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi

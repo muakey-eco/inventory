@@ -90,7 +90,7 @@ Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò*
 4. **Application** gắn provider trên, kèm policy/binding chỉ cho thành viên ba group `kho-*` vào.
 5. **Flow** xác thực của Application phải bắt MFA (stage Authenticator Validation, không để "skip" khi người dùng chưa có thiết bị). Kho không chặn theo `amr`, chỉ ghi Nhật ký bảo mật "Đăng nhập thiếu bằng chứng MFA" khi `amr` thiếu `mfa` (Authentik bỏ `mfa` cả khi stage MFA được bỏ qua nhờ cookie).
 
-Rồi đặt `AUTHENTIK_ISSUER` (`https://auth.example.com/application/o/<slug-của-application>/`, có dấu `/` cuối) và `AUTHENTIK_CLIENT_ID` trong `config.env` của k3s-ops, còn `AUTHENTIK_CLIENT_SECRET` trên Infisical (xem [Dựng lần đầu trên k3s](#dựng-lần-đầu-trên-k3s)).
+Rồi đặt `AUTHENTIK_ISSUER` (`https://auth.example.com/application/o/<slug-của-application>/`, có dấu `/` cuối) và `AUTHENTIK_CLIENT_ID` trong `deploy/k3s/config.env`, còn `AUTHENTIK_CLIENT_SECRET` trên Infisical (xem [Dựng lần đầu trên k3s](#dựng-lần-đầu-trên-k3s)).
 
 Đăng xuất ở kho chỉ huỷ phiên kho, không đụng phiên Authentik. Mọi lần từ chối (không có Vai trò, bị Khoá nhân viên, state/nonce sai, Authentik báo lỗi) dừng ở một trang tĩnh có nút Thử lại, không tự chuyển hướng.
 
@@ -121,14 +121,27 @@ Không cần thêm biến môi trường: kho dùng lại `AUTHENTIK_ISSUER` và
 
 ### Chạy trên k3s
 
-Manifest nằm ở `applications/inventory/` của `muakey-eco/k3s-ops` (ADR 0009), Argo CD đồng bộ từ nhánh `main`. Panel ở `https://kho.muakeyoffice.net`, chỉ mở cho Tailscale, mạng riêng và dải pod của cụm. `docker/build-prod.sh` đẩy image lên Registry nội bộ `cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory`, người build cần `docker login cr-hn-1.bizflycloud.vn` trước. Manifest ghi image là `muakey/inventory`, và node tự ánh xạ bí danh đó sang Registry nội bộ, nên namespace không có `imagePullSecret` (ADR 0001 của k3s-ops). Env lấy từ ConfigMap (`config.env` trong k3s-ops) và Secret (`externalsecret.yaml`, kéo từ Infisical `/inventory/*`, ADR 0010): image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
+Bản gốc manifest nằm ở [`deploy/k3s/`](deploy/k3s/kustomization.yaml) (ADR 0009), theo cùng khuôn với `paygate` và `muakey-account`. Argo CD không đọc repo này: nó đồng bộ từ bản chép ở `applications/inventory/` của `muakey-eco/k3s-ops`, nhánh `main`. Sửa ở `deploy/k3s/` trước, rồi chép **nguyên thư mục** sang. `newTag` trong `deploy/k3s/kustomization.yaml` luôn là SHA đang chạy.
 
-**Deploy** là chạy `docker/build-prod.sh`, đổi `newTag` trong `applications/inventory/kustomization.yaml` của k3s-ops thành tag script in ra, rồi push lên `main`. `app` rolling hai replica nên không gián đoạn; `queue` và `scheduler` dừng vài giây. **Rollback** là đặt lại tag cũ, nhưng chỉ lùi an toàn được một release (migration theo expand/contract, xem AGENTS.md). Đổi secret trên Infisical không làm pod đổi theo: đợi Secret cập nhật (tối đa một giờ, hoặc `kubectl -n inventory annotate externalsecret inventory-secrets force-sync=$(date +%s) --overwrite`), rồi `kubectl -n inventory rollout restart deployment/app deployment/queue deployment/scheduler`.
+Panel ở `https://kho.muakeyoffice.net`, chỉ mở cho Tailscale, mạng riêng và dải pod của cụm. `docker/build-prod.sh` đẩy image lên Registry nội bộ `cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory`, người build cần `docker login cr-hn-1.bizflycloud.vn` trước. Manifest ghi image là `muakey/inventory`, và node tự ánh xạ bí danh đó sang Registry nội bộ, nên namespace không có `imagePullSecret` (ADR 0001 của k3s-ops). Env lấy từ ConfigMap (`deploy/k3s/config.env`) và Secret `inventory-secret` (`deploy/k3s/externalsecret.yaml`, kéo từ Infisical `/inventory/*`, ADR 0010): image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
 
-- **initContainer.** Cả ba Deployment `app`, `queue`, `scheduler` dùng cùng một initContainer, cùng image, `args: ["inventory-init"]`. Đặt `args`, không đặt `command`, để ENTRYPOINT vẫn chạy trước. Script chạy `migrate --force --isolated`, chờ tới khi không còn migration pending (tối đa `INVENTORY_MIGRATE_WAIT_SECONDS`, mặc định 600), rồi chạy `inventory:keys:verify`. Pod lấy được khoá trong bảng `cache_locks` là pod duy nhất migrate. Bảng đó phải có từ trước, nên **lần dựng đầu** (`migrate --force`, `inventory:keys:register`, `db:seed --class=RoleSeeder --force`) chạy bằng tay, xem [Dựng lần đầu trên k3s](#dựng-lần-đầu-trên-k3s). Khoá chỉ loại trừ được giữa các pod khi cache store dùng chung, nên script từ chối chạy khi `CACHE_STORE` khác `database` hoặc `redis`. Pod giữ khoá chết giữa chừng thì khoá còn tới một giờ, và các pod khác hết hạn chờ rồi khởi động lại liên tục. Gỡ bằng `DELETE FROM cache_locks WHERE key LIKE '%framework/command-migrate%';`.
-- **Container chính.** `app` giữ CMD mặc định (FrankenPHP cổng 8000). `queue` chạy `php artisan queue:work --tries=1`, `scheduler` chạy `php artisan schedule:work`.
-- **Probe.** `HEALTHCHECK` của image nền gọi admin Caddy cổng 2019. Kubelet bỏ qua `HEALTHCHECK`, nhưng đừng chép nó sang probe: `queue` và `scheduler` không chạy Caddy. Chỉ `app` có readiness/liveness probe, là `httpGet` `/up` cổng 8000. `queue` và `scheduler` không có probe HTTP.
-- **`readOnlyRootFilesystem: true`.** Cờ này đặt theo từng container, và initContainer cũng chạy ENTRYPOINT. Container nào bật thì phải gắn emptyDir vào `/app/storage` và `/tmp` (upload PHP), kể cả initContainer. `app` gắn thêm `/data` và `/config` (state của Caddy). Khi `bootstrap/cache` chỉ-đọc, entrypoint ghi cache cấu hình vào `/app/storage/framework/config.php`. Nếu khi đó `/app/storage` cũng chỉ-đọc thì container thoát ngay với lỗi nói rõ điều đó. Route cache và cache Filament nướng sẵn trong `bootstrap/cache` nên vẫn dùng được. View cache nướng trong `storage/framework/views` bị emptyDir che mất, nên view được biên dịch lại lúc chạy, mỗi pod một lần. Manifest hiện chưa bật cờ này.
+**Deploy:**
+
+1. Chạy `docker/build-prod.sh` trên một commit sạch của `master`. Script tag image bằng SHA 7 ký tự, không đẩy `latest`.
+2. Đặt SHA script in ra vào `newTag` trong `deploy/k3s/kustomization.yaml`, rồi commit lên `master`.
+3. Chép `deploy/k3s/` sang `k3s-ops/applications/inventory/` và đẩy lên `main` của k3s-ops.
+
+Argo CD tự sync: Job `migrate` chạy, `web` rolling hai replica nên không gián đoạn, còn `queue` và `scheduler` dừng vài giây.
+
+**Rollback** là đặt lại SHA cũ ở `deploy/k3s/kustomization.yaml` rồi chép lại. Không cần build lại gì, nhưng chỉ lùi an toàn được một release (migration theo expand/contract, xem AGENTS.md).
+
+Đổi secret trên Infisical không làm pod đổi theo. Đợi Secret cập nhật (tối đa một giờ, hoặc `kubectl -n inventory annotate externalsecret inventory-secret force-sync=$(date +%s) --overwrite`), rồi `kubectl -n inventory rollout restart deployment/web deployment/queue deployment/scheduler`.
+
+- **Job `migrate`.** Là hook `Sync` của Argo CD (`BeforeHookCreation`): mỗi lần sync, Argo xoá Job cũ rồi dựng Job mới. Job chạy `migrate --force` rồi `db:seed --class=RoleSeeder --force`. Seeder chạy lại nhiều lần vẫn an toàn. Chỉ Job này migrate, nên không cần khoá giữa các pod.
+- **initContainer `wait-for-migrate`.** Cả ba Deployment `web`, `queue`, `scheduler` có cùng một initContainer, cùng image, `args: ["inventory-init"]`. Đặt `args`, không đặt `command`, để ENTRYPOINT vẫn chạy trước. Script chờ tới khi không còn migration pending (tối đa `INVENTORY_MIGRATE_WAIT_SECONDS`, mặc định 600, rồi pod khởi động lại), sau đó chạy `inventory:keys:verify`. Khoá không khớp thì pod không bao giờ lên.
+- **Container chính.** `web` giữ CMD mặc định (FrankenPHP cổng 8000). `queue` chạy `php artisan queue:work --tries=1`, `scheduler` chạy `php artisan schedule:work`.
+- **Probe.** `HEALTHCHECK` của image nền gọi admin Caddy cổng 2019. Kubelet bỏ qua `HEALTHCHECK`, nhưng đừng chép nó sang probe: `queue` và `scheduler` không chạy Caddy. Chỉ `web` có readiness/liveness probe, là `httpGet` `/up` cổng 8000. `queue` và `scheduler` không có probe HTTP.
+- **`readOnlyRootFilesystem: true`.** Cờ này đặt theo từng container, và initContainer cũng chạy ENTRYPOINT. Container nào bật thì phải gắn emptyDir vào `/app/storage` và `/tmp` (upload PHP), kể cả initContainer. `web` gắn thêm `/data` và `/config` (state của Caddy). Khi `bootstrap/cache` chỉ-đọc, entrypoint ghi cache cấu hình vào `/app/storage/framework/config.php`. Nếu khi đó `/app/storage` cũng chỉ-đọc thì container thoát ngay với lỗi nói rõ điều đó. Route cache và cache Filament nướng sẵn trong `bootstrap/cache` nên vẫn dùng được. View cache nướng trong `storage/framework/views` bị emptyDir che mất, nên view được biên dịch lại lúc chạy, mỗi pod một lần. Manifest hiện chưa bật cờ này.
 
 #### Dựng lần đầu trên k3s
 
@@ -157,46 +170,52 @@ Việc tay, làm một lần, cần người có quyền trên từng hệ thố
 
 3. **Authentik** `https://auth.muakeyoffice.net`: làm đủ các bước ở [Đăng nhập qua Authentik](#đăng-nhập-qua-authentik), [Đối soát nhân viên](#đối-soát-nhân-viên-với-authentik) (service account `kho-sync`) và [Back-channel logout](#back-channel-logout-từ-authentik), với slug Application là `inventory` và:
    - Redirect URI (strict): `https://kho.muakeyoffice.net/admin/auth/callback`.
-   - Logout URI: `http://app.inventory.svc/auth/authentik/backchannel-logout`. Authentik chạy trong cùng cụm nên gọi thẳng Service `app`, không qua ingress (ingress chỉ mở cho mạng nội bộ).
+   - Logout URI: `http://web.inventory.svc:8000/auth/authentik/backchannel-logout`. Authentik chạy trong cùng cụm nên gọi thẳng Service `web`, không qua ingress (ingress chỉ mở cho mạng nội bộ).
 
-   Client ID là cấu hình, không phải bí mật: ghi vào `AUTHENTIK_CLIENT_ID` trong `applications/inventory/config.env` của k3s-ops. Tới lúc đó pod vẫn chạy, chỉ đăng nhập là hỏng.
+   Client ID là cấu hình, không phải bí mật: ghi vào `AUTHENTIK_CLIENT_ID` trong `deploy/k3s/config.env`. Tới lúc đó pod vẫn chạy, chỉ đăng nhập là hỏng.
 
-4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ mười khoá mà `externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
+4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ chín khoá mà `deploy/k3s/externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
 
    | Khoá | Giá trị |
    |---|---|
    | `APP_KEY` | `echo "base64:$(openssl rand -base64 32)"` |
    | `INVENTORY_CONTENT_KEY`, `INVENTORY_HMAC_KEY` | mỗi khoá một lần `echo "1:base64:$(openssl rand -base64 32)"` |
    | `INVENTORY_CONTENT_PREVIOUS_KEYS` | rỗng |
-   | `INVENTORY_BACKUP_KEY` | rỗng: khoá đã bỏ, app không đọc nữa, chỉ còn vì `externalsecret.yaml` chưa gỡ (xem [Khoá mã hoá](#khoá-mã-hoá)) |
    | `DB_PASSWORD` | mật khẩu ở bước 1 |
    | `AUTHENTIK_CLIENT_SECRET`, `AUTHENTIK_API_TOKEN` | từ bước 3 |
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | access key của versitygw, quyền đọc ghi bucket `muakey-inventory` |
 
    Hai khoá `INVENTORY_*_KEY` cần một bản sao ngoài Infisical, tách khỏi backup Postgres và bucket (ADR 0001, 0010): mất khoá nội dung là mất toàn bộ hàng.
 
-5. **Image**: `docker/build-prod.sh`, rồi đặt tag nó in ra vào `newTag` trong k3s-ops và push lên `main`.
+5. **Image và manifest**: deploy như ở trên. Lần đầu, k3s-ops còn phải có dòng `- inventory/application.yaml` trong `applications/kustomization.yaml`.
 
-Lần sync đầu, mọi pod kẹt ở initContainer `migrate` vì database còn trống (chưa có bảng `cache_locks`). Đó là dự kiến. Chạy lần dựng đầu bằng một pod tạm, cùng image và cùng env với Deployment:
+Lần sync đầu, Job `migrate` dựng schema và seed Vai trò. Pod `web`, `queue`, `scheduler` thì kẹt ở initContainer `wait-for-migrate`, vì `inventory:keys:verify` thất bại khi chưa có dấu vân tay khoá nào. Đó là dự kiến. Đăng ký khoá một lần bằng một pod tạm, cùng image và cùng env với Deployment:
 
 ```bash
-image=$(kubectl -n inventory get deploy app -o jsonpath='{.spec.template.spec.containers[0].image}')
-config=$(kubectl -n inventory get deploy app -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
-kubectl -n inventory run bootstrap --rm -i --restart=Never --image="$image" --overrides="{
+image=$(kubectl -n inventory get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}')
+config=$(kubectl -n inventory get deploy web -o jsonpath='{.spec.template.spec.containers[0].envFrom[1].configMapRef.name}')
+kubectl -n inventory run keys-register --rm -i --restart=Never --image="$image" --overrides="{
   \"spec\": {
     \"automountServiceAccountToken\": false,
     \"containers\": [{
-      \"name\": \"bootstrap\",
+      \"name\": \"keys-register\",
       \"image\": \"$image\",
-      \"args\": [\"sh\", \"-c\", \"php artisan migrate --force && php artisan inventory:keys:register && php artisan db:seed --class=RoleSeeder --force\"],
-      \"envFrom\": [{\"configMapRef\": {\"name\": \"$config\"}}, {\"secretRef\": {\"name\": \"inventory-secrets\"}}]
+      \"args\": [\"php\", \"artisan\", \"inventory:keys:register\"],
+      \"envFrom\": [{\"secretRef\": {\"name\": \"inventory-secret\"}}, {\"configMapRef\": {\"name\": \"$config\"}}]
     }]
   }
 }"
-kubectl -n inventory rollout restart deployment/app deployment/queue deployment/scheduler
 ```
 
-Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho-quan-tri` đăng nhập. Nghiệm thu bằng tay: đăng nhập qua Authentik, nhập một Lô nhập, xuất kho, gửi một Báo lỗi có ảnh, rồi deploy một tag mới trong lúc gọi `/up` liên tục để thấy `app` không gián đoạn.
+Pod đang kẹt tự lên ở lần thử lại kế tiếp của initContainer. Muốn nhanh hơn thì `kubectl -n inventory rollout restart deployment/web deployment/queue deployment/scheduler`.
+
+Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho-quan-tri` đăng nhập. Nghiệm thu bằng tay:
+- Đăng nhập qua Authentik. Trang panel tải được `livewire.min.js`, vì route cache nướng trong image mà prefix route của Livewire tính từ `APP_KEY` lúc chạy.
+- Nhập một Lô nhập. Bước này kiểm CORS của bucket.
+- Xuất kho.
+- Gửi một Báo lỗi có ảnh.
+- Tắt phiên của mình trên Authentik để thấy back-channel logout huỷ phiên kho.
+- Deploy một tag mới trong lúc gọi `/up` liên tục để thấy `web` không gián đoạn.
 
 ### File trên S3-compatible (k3s)
 
@@ -207,7 +226,7 @@ Mỗi loại một thư mục trong bucket: `batch-lines/` và `batch-rejected/`
 ### Những gì production chưa lo
 
 - **Backup.** Chưa có gì tự động: `pg_dump` và ảnh Báo lỗi là việc riêng. Ảnh Báo lỗi nằm ở `defect-reports/` trong bucket. Chỉ backup `defect-reports/` của bucket: `livewire-tmp/` là upload tạm bản rõ. Nội dung Lô nhập chờ xác nhận cố ý không vào backup. Khoá phải có bản sao ngoài server, tách khỏi backup (ADR 0001).
-- **TLS, tên miền, chứng chỉ**: của ingress trong k3s-ops.
+- **TLS, tên miền, chứng chỉ**: của ingress (`deploy/k3s/ingress.yaml`) và cert-manager của cụm.
 
 ## Khoá mã hoá
 
@@ -215,11 +234,11 @@ Khoá nội dung và khoá HMAC nằm trên Infisical (`.env` ở dev), tách kh
 
 - `php artisan inventory:keys:register`: đăng ký dấu vân tay các khoá mới (lần đầu, hoặc khi thêm phiên bản). Không ghi đè dấu vân tay đã có; ghi Nhật ký bảo mật.
 - `php artisan inventory:keys:verify`: chạy trước khi web server khởi động; queue worker cũng tự kiểm tra khi khởi động. Khoá không khớp thì từ chối chạy.
-- `php artisan inventory:keys:rotate <content|hmac>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa khoá trên Infisical trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`), cho pod nhận secret mới như ở [Chạy trên k3s](#chạy-trên-k3s), rồi chạy lệnh **ngay** qua `kubectl -n inventory exec deploy/app --`: từ lúc pod nhận khoá mới tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
+- `php artisan inventory:keys:rotate <content|hmac>`: xoay một khoá sang phiên bản mới, khi nghi lộ khoá hoặc khi người giữ khoá rời đi. Sửa khoá trên Infisical trước (thêm phiên bản mới; khoá nội dung cũ chuyển sang `INVENTORY_CONTENT_PREVIOUS_KEYS`), cho pod nhận secret mới như ở [Chạy trên k3s](#chạy-trên-k3s), rồi chạy lệnh **ngay** qua `kubectl -n inventory exec deploy/web --`: từ lúc pod nhận khoá mới tới lúc lệnh đăng ký xong dấu vân tay, mọi tiến trình ghi đều từ chối chạy. Mỗi lần xoay ghi hai dòng Nhật ký bảo mật (bắt đầu và kết thúc) kèm loại khoá, phiên bản cũ/mới, dấu vân tay và mốc thời gian, không bao giờ kèm giá trị khoá. Lệnh bị ngắt giữa chừng thì cứ chạy lại: nó chỉ làm nốt phần còn lại.
   - `content`: mã hoá lại từng chunk 500 Đơn vị hàng (`secret_key_version` trên bản ghi cho biết còn ai ở khoá cũ). Kho chạy bình thường suốt lúc chạy vì bản ghi chưa mã hoá lại vẫn đọc được bằng khoá cũ. Giữ khoá cũ trong `INVENTORY_CONTENT_PREVIOUS_KEYS` thêm ít nhất `INVENTORY_INTAKE_PENDING_TTL_HOURS` giờ: nội dung Lô nhập chờ xác nhận nằm trên disk còn mã hoá bằng khoá đó.
   - `hmac`: tính lại `stock_units.dedupe_hash` từ chính nội dung hàng, không cần khoá HMAC cũ. Nhập hàng tạm dừng chừng nào còn Đơn vị hàng ở `dedupe_hmac_version` cũ (kho không giữ song song hai hash), xuất kho vẫn chạy vì Thứ tự xuất không đọc Khoá chống trùng; tra cứu theo Khoá chống trùng không tìm thấy trong lúc lệnh chạy dở. Xem ADR 0003.
 
-Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì nên đã bỏ. Dấu vân tay `backup` đã đăng ký vẫn nằm trong DB vì bảng chỉ-ghi-thêm, và app bỏ qua chúng. Gỡ khoá khỏi production ở **release sau** release bỏ khoá: tới lúc đó, rollback về bản còn đọc khoá vẫn phải chạy được, mà bản ấy thiếu khoá backup thì `inventory:keys:verify` thất bại và mọi tiến trình ghi từ chối chạy. Khi gỡ, bỏ `INVENTORY_BACKUP_KEY` khỏi `externalsecret.yaml` trong k3s-ops trước, rồi mới xoá trên Infisical: xoá trên Infisical trước thì Secret không được tạo và không pod nào chạy.
+Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì nên đã bỏ. Dấu vân tay `backup` đã đăng ký (nếu có) vẫn nằm trong DB vì bảng chỉ-ghi-thêm, và app bỏ qua chúng. Production trên k3s dựng sau khi khoá đã bỏ, nên `deploy/k3s/externalsecret.yaml` không còn liệt kê nó. Khoá còn sót trên Infisical thì xoá được bất cứ lúc nào.
 
 ## Nhập hàng
 
@@ -356,7 +375,7 @@ Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì n
 Khi Quản trị bị Khoá nhân viên mà không còn Quản trị nào khác mở được, người vận hành server chạy:
 
 ```bash
-kubectl -n inventory exec deploy/app -- php artisan staff:recover-owner chu@shop.test --unlock
+kubectl -n inventory exec deploy/web -- php artisan staff:recover-owner chu@shop.test --unlock
 ```
 
 Chỉ áp dụng cho nhân viên mang Vai trò Quản trị; mỗi lần ghi Nhật ký bảo mật. Mất thiết bị MFA hay quên mật khẩu thì xử lý trên Authentik, không phải ở kho.

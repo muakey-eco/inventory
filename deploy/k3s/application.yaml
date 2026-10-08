@@ -1,0 +1,31 @@
+# Application của Argo CD cho kho (ADR 0009). Bản chạy thật nằm ở
+# `k3s-ops/applications/inventory/application.yaml`, được app-of-apps
+# `applications` nạp qua một dòng `- inventory/application.yaml` trong
+# `applications/kustomization.yaml`.
+#
+# File này KHÔNG nằm trong `resources` của `kustomization.yaml` cạnh nó: khối
+# `namespace: inventory` ở đó sẽ kéo Application khỏi `argocd`, và một
+# Application tự quản chính nó thì xoá được chính nó.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inventory
+  namespace: argocd
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: inventory
+
+  sources:
+    - repoURL: git@github.com:muakey-eco/k3s-ops.git
+      path: applications/inventory
+      targetRevision: main
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

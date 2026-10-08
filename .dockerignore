@@ -50,3 +50,6 @@ phpunit.xml
 phpstan.neon
 docs/
 skills-lock.json
+
+# Manifest k3s: bản gốc ở đây rồi chép sang k3s-ops, không thuộc về image.
+deploy/

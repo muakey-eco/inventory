@@ -51,5 +51,6 @@ phpstan.neon
 docs/
 skills-lock.json
 
-# Manifest k3s: bản gốc ở đây rồi chép sang k3s-ops, không thuộc về image.
+# Manifest k3s và script build/deploy chạy trên máy dev, không thuộc về image.
 deploy/
+scripts/

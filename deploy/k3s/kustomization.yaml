@@ -54,7 +54,7 @@ patches:
       kind: Deployment
       labelSelector: inventory/image=app
 
-# SHA ngắn đang chạy, do `docker/build-prod.sh` in ra. Deploy là commit đổi dòng
+# SHA ngắn đang chạy, do `scripts/build-image.sh` in ra. Deploy là commit đổi dòng
 # này rồi chép sang k3s-ops; rollback là đặt lại SHA cũ, nhưng chỉ lùi an toàn
 # được một release (migration theo expand/contract, AGENTS.md). Không bao giờ
 # `latest`: Argo CD so manifest chứ không so digest.

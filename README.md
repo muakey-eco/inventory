@@ -66,7 +66,7 @@ Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev serv
 
 ## Triển khai production
 
-Production chạy trên cụm k3s dùng chung của tổ chức ([ADR 0009](docs/adr/0009-kho-chay-tren-k3s-nhieu-replica.md)), xem [Chạy trên k3s](#chạy-trên-k3s). Repo không còn stack Compose cho production: `compose.yaml` chỉ dành cho dev. Image build thủ công trên máy dev bằng `docker/build-prod.sh` rồi đẩy lên Registry nội bộ (Bizfly Container Registry của Muakey).
+Production chạy trên cụm k3s dùng chung của tổ chức ([ADR 0009](docs/adr/0009-kho-chay-tren-k3s-nhieu-replica.md)), xem [Chạy trên k3s](#chạy-trên-k3s). Repo không còn stack Compose cho production: `compose.yaml` chỉ dành cho dev. Image build thủ công trên máy dev bằng `scripts/build-image.sh` rồi đẩy lên Registry nội bộ (Bizfly Container Registry của Muakey).
 
 ### Đăng nhập qua Authentik
 
@@ -123,11 +123,11 @@ Không cần thêm biến môi trường: kho dùng lại `AUTHENTIK_ISSUER` và
 
 Bản gốc manifest nằm ở [`deploy/k3s/`](deploy/k3s/kustomization.yaml) (ADR 0009), theo cùng khuôn với `paygate` và `muakey-account`. Argo CD không đọc repo này: nó đồng bộ từ bản chép ở `applications/inventory/` của `muakey-eco/k3s-ops`, nhánh `main`. Sửa ở `deploy/k3s/` trước, rồi chép **nguyên thư mục** sang. `newTag` trong `deploy/k3s/kustomization.yaml` luôn là SHA đang chạy.
 
-Panel ở `https://kho.muakeyoffice.net`, chỉ mở cho Tailscale, mạng riêng và dải pod của cụm. `docker/build-prod.sh` đẩy image lên Registry nội bộ `cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory`, người build cần `docker login cr-hn-1.bizflycloud.vn` trước. Manifest ghi image là `muakey/inventory`, và node tự ánh xạ bí danh đó sang Registry nội bộ, nên namespace không có `imagePullSecret` (ADR 0001 của k3s-ops). Env lấy từ ConfigMap (`deploy/k3s/config.env`) và Secret `inventory-secret` (`deploy/k3s/externalsecret.yaml`, kéo từ Infisical `/inventory/*`, ADR 0010): image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
+Panel ở `https://kho.muakeyoffice.net`, chỉ mở cho Tailscale, mạng riêng và dải pod của cụm. `scripts/build-image.sh` đẩy image lên Registry nội bộ `cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory`, người build cần `docker login cr-hn-1.bizflycloud.vn` trước. Manifest ghi image là `muakey/inventory`, và node tự ánh xạ bí danh đó sang Registry nội bộ, nên namespace không có `imagePullSecret` (ADR 0001 của k3s-ops). Env lấy từ ConfigMap (`deploy/k3s/config.env`) và Secret `inventory-secret` (`deploy/k3s/externalsecret.yaml`, kéo từ Infisical `/inventory/*`, ADR 0010): image không đọc file `.env` nào, và cấu hình được cache lúc container khởi động.
 
 **Deploy:**
 
-1. Chạy `docker/build-prod.sh` trên một commit sạch của `master`. Script tag image bằng SHA 7 ký tự, không đẩy `latest`.
+1. Chạy `scripts/build-image.sh` trên một commit sạch của `master`. Script tag image bằng SHA 7 ký tự, không đẩy `latest`.
 2. Đặt SHA script in ra vào `newTag` trong `deploy/k3s/kustomization.yaml`, rồi commit lên `master`.
 3. Chép `deploy/k3s/` sang `k3s-ops/applications/inventory/` và đẩy lên `main` của k3s-ops.
 

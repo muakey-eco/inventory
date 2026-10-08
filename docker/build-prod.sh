@@ -6,10 +6,10 @@
 set -euo pipefail
 
 # Registry nội bộ của Muakey (Bizfly CR). Cụm k3s kéo cùng image này dưới bí danh `muakey/inventory`,
-# node tự ánh xạ sang đây (ADR 0001 của muakey-eco/k3s-ops). Source vẫn ở repo cá nhân, nên nhãn
-# source không suy ra từ tên image được.
+# node tự ánh xạ sang đây (ADR 0001 của muakey-eco/k3s-ops). Tên image không mang org của repo
+# source, nên nhãn source không suy ra từ tên image được.
 IMAGE="${IMAGE:-cr-hn-1.bizflycloud.vn/7cc21c55e13e43b992d6498e54de2661/inventory}"
-SOURCE_REPO="${SOURCE_REPO:-nghianb/inventory}"
+SOURCE_REPO="${SOURCE_REPO:-muakey-eco/inventory}"
 
 cd "$(dirname "$0")/.."
 

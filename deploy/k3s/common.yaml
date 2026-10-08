@@ -1,0 +1,43 @@
+# Phần chung của mọi Deployment dựng từ image kho. Tên `common` chỉ để patch hợp
+# lệ; `target` trong `kustomization.yaml` mới quyết định nó vá vào đâu. Mọi
+# container ứng dụng tên `inventory` để patch này khớp được.
+#
+# Sửa file này thì sửa luôn `common-job.yaml` (hai file giống nhau trừ `kind`,
+# vì patch chiến lược của kustomize cần biết kiểu tài nguyên) và initContainer
+# trong `wait-for-migrate.yaml` (cùng `envFrom` và `securityContext`).
+#
+# Mọi container khai `args`, KHÔNG `command`: `command` ghi đè ENTRYPOINT của
+# image, tức bỏ qua `inventory-entrypoint` và bước `config:cache` của nó.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: common
+spec:
+  template:
+    spec:
+      # Không `imagePullSecrets`: node kéo `muakey/*` qua mirror về Registry nội
+      # bộ, credential nằm ở node (k3s-ops ADR 0001).
+      # Không pod nào của kho gọi API của cluster. Token ServiceAccount mount sẵn
+      # là một credential nằm cạnh khoá nội dung mà không đổi lấy được gì.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        # User `app` của image (`docker/php/Dockerfile`).
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: inventory
+          image: inventory
+          # ConfigMap đứng SAU Secret: trùng khoá thì nguồn sau thắng, nên giá
+          # trị trong git (`APP_ENV=production`, `APP_DEBUG=false`,
+          # `SESSION_SECURE_COOKIE=true`) không bị một khoá lạc trong Infisical
+          # lật lại.
+          envFrom:
+            - secretRef:
+                name: inventory-secret
+            - configMapRef:
+                name: inventory-config
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

@@ -1,0 +1,34 @@
+# Bản sao của `common.yaml` cho Job `migrate`, xem ghi chú ở đó.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: common
+spec:
+  template:
+    spec:
+      # Không `imagePullSecrets`: node kéo `muakey/*` qua mirror về Registry nội
+      # bộ, credential nằm ở node (k3s-ops ADR 0001).
+      # Không pod nào của kho gọi API của cluster. Token ServiceAccount mount sẵn
+      # là một credential nằm cạnh khoá nội dung mà không đổi lấy được gì.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        # User `app` của image (`docker/php/Dockerfile`).
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: inventory
+          image: inventory
+          # ConfigMap đứng SAU Secret: trùng khoá thì nguồn sau thắng, nên giá
+          # trị trong git (`APP_ENV=production`, `APP_DEBUG=false`,
+          # `SESSION_SECURE_COOKIE=true`) không bị một khoá lạc trong Infisical
+          # lật lại.
+          envFrom:
+            - secretRef:
+                name: inventory-secret
+            - configMapRef:
+                name: inventory-config
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

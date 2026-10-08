@@ -1,0 +1,50 @@
+# Chạy một lần rồi thoát. Chỉ Job này chạy migration; mọi Deployment chỉ chờ
+# (`wait-for-migrate.yaml`), nên không cần khoá `migrate --isolated` giữa các
+# pod (ADR 0009).
+#
+# Seed Vai trò chạy theo ngay sau: `RoleSeeder` chạy lại nhiều lần vẫn an toàn,
+# nên lần dựng đầu không còn bước seed tay. `inventory:keys:register` thì KHÔNG
+# chạy ở đây: tự đăng ký là `keys:verify` mất tác dụng, khoá sai trên Infisical
+# sẽ được nhận luôn thay vì bị chặn. Nó chạy tay một lần (README).
+#
+# Template của Job là bất biến: áp image mới lên một Job còn tồn tại sẽ bị từ
+# chối. Nên Job này là hook `Sync` của Argo CD: mỗi lần sync, Argo xoá Job cũ
+# rồi dựng Job mới. Không `ttlSecondsAfterFinished`: Job tự biến mất là Argo
+# thấy `OutOfSync`, dựng lại, và migrate chạy lại, mãi.
+#
+# Không `PreSync`: hook ấy chạy trước cả namespace và Secret trong lần sync đầu
+# tiên. `Sync` chạy cùng pha với mọi thứ khác, theo `sync-wave`, sau
+# ExternalSecret và ConfigMap (-1).
+#
+# Migration phải tương thích ngược (expand/contract, AGENTS.md): pod của image
+# cũ còn chạy trên schema mới, cả lúc rollout lẫn sau rollback.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  labels:
+    inventory/image: app
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrate
+    spec:
+      # KHÔNG `OnFailure` lặp tại chỗ vô hạn: `backoffLimit` là trần.
+      restartPolicy: Never
+      containers:
+        - name: inventory
+          args:
+            - sh
+            - -c
+            - php artisan migrate --force && php artisan db:seed --class=RoleSeeder --force
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi

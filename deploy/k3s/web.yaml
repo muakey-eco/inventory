@@ -1,0 +1,88 @@
+# Panel Filament, API cấp hàng và back-channel logout của Authentik. FrankenPHP
+# chạy CMD mặc định của image, chỉ HTTP ở cổng 8000 (`SERVER_NAME` trong
+# Dockerfile); TLS kết thúc ở ingress-nginx.
+#
+# Workload DUY NHẤT có Service: `queue` và `scheduler` không nhận gì.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    inventory/image: app
+spec:
+  replicas: 2
+  # Rollout không lúc nào dưới 2 pod Ready: deploy không gián đoạn (ADR 0009).
+  # Drain node thì PDB cho xuống 1.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: web
+      containers:
+        - name: inventory
+          ports:
+            - name: http
+              containerPort: 8000
+          # `/up` đi qua PHP và boot trọn framework, nhưng không chạm Postgres:
+          # DB sập thì pod vẫn Ready. Cố ý: cả hai pod cùng rớt khỏi Service vì
+          # một sự cố chung không cứu được request nào. Không probe cổng admin
+          # 2019 của Caddy như HEALTHCHECK của image nền.
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            # Chờ ingress-nginx bỏ pod khỏi upstream trước khi FrankenPHP dừng,
+            # để request đang tới không gặp 502 lúc rollout.
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+# Cũng là đích back-channel logout của Authentik trong cluster:
+# `http://web.inventory.svc:8000/auth/authentik/backchannel-logout`, không qua
+# ingress (ingress chỉ mở cho mạng nội bộ).
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

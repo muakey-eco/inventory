@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issue được quản lý trên GitHub Issues của `nghianb/inventory` (dùng `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issue được quản lý trên GitHub Issues của `muakey-eco/inventory` (dùng `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

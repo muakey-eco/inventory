@@ -4,7 +4,7 @@
 # không trôi dạt khỏi nhau: cùng phiên bản PHP, cùng danh sách extension, cùng giới hạn upload.
 #
 #   docker compose build                     -> target dev  (bind mount, có pcntl và Composer)
-#   docker/build-prod.sh                     -> target prod (code + vendor + asset nướng vào image)
+#   scripts/build-image.sh                   -> target prod (code + vendor + asset nướng vào image)
 
 ARG FRANKENPHP_VERSION=1.12.7-php8.4.25
 ARG NODE_VERSION=22.23.2-trixie-slim

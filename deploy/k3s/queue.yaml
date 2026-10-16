@@ -1,0 +1,36 @@
+# Worker hàng đợi `database`: kiểm tra Lô nhập (`ValidateBatch`) và các job khác.
+#
+# Một bản, `Recreate`: không bao giờ có hai worker khác phiên bản. Pod `web` cũ
+# vẫn dispatch job trong lúc rolling, nên worker mới vẫn phải chạy được job theo
+# class và payload của release trước (ADR 0009).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue
+  labels:
+    inventory/image: app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: queue
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: queue
+    spec:
+      # `queue:work` bắt SIGTERM: ngừng nhận job mới rồi chạy nốt job đang dở.
+      # Phải dài hơn `--timeout` mặc định 60 giây.
+      terminationGracePeriodSeconds: 90
+      containers:
+        - name: inventory
+          # Cùng `--tries` với compose.yaml của dev.
+          args: ["php", "artisan", "queue:work", "--tries=1"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 768Mi

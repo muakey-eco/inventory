@@ -1,0 +1,39 @@
+# Mọi Deployment đợi Job `migrate` CHẠY XONG, rồi kiểm khoá mã hoá, trước khi
+# container chính lên.
+#
+# `inventory-init` (`docker/prod/init.sh`) hỏi chính database cho tới khi
+# `migrate:status --pending=1` hết migration pending, rồi chạy
+# `inventory:keys:verify`: khoá không khớp dấu vân tay trong DB thì initContainer
+# thất bại và pod không bao giờ nhận traffic hay job. Lần dựng đầu, pod dừng ở
+# đây cho tới khi `inventory:keys:register` chạy tay (README).
+#
+# Chỉ chặn pod MỚI. Pod của image cũ vẫn phục vụ trên schema mới trong lúc
+# rollout, và sau rollback bằng `newTag` thì phục vụ mãi, nên migration bắt
+# buộc tương thích ngược.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wait-for-migrate
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-migrate
+          image: inventory
+          # `args`, không `command`: `command` ghi đè ENTRYPOINT của image.
+          args: ["inventory-init"]
+          envFrom:
+            - secretRef:
+                name: inventory-secret
+            - configMapRef:
+                name: inventory-config
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi

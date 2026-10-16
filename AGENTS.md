@@ -14,7 +14,7 @@ Single-context: một `CONTEXT.md` và `docs/adr/` ở gốc repo. See `docs/age
 
 ## Migration tương thích ngược một phiên bản
 
-Production chạy trên k3s, nên luật này áp dụng cho mọi migration mới. Migration chạy trong initContainer **trước** khi pod mới nhận traffic, và pod `app` của release trước vẫn phục vụ trên schema mới tới khi rolling xong (ADR 0009). Mọi migration đi theo expand/contract, mỗi bước là một release:
+Production chạy trên k3s, nên luật này áp dụng cho mọi migration mới. Migration chạy trong Job `migrate` **trước** khi pod mới nhận traffic, và pod `web` của release trước vẫn phục vụ trên schema mới tới khi rolling xong (ADR 0009). Mọi migration đi theo expand/contract, mỗi bước là một release:
 
 - **Xoá cột:** release 1 bỏ mọi chỗ đọc và ghi cột; release 2 xoá cột.
 - **Đổi tên cột**, ví dụ `note` thành `remark`: release 1 thêm `remark` và ghi cả hai cột; release 2 backfill `remark` từ `note`, chuyển đọc sang `remark` nhưng vẫn ghi cả hai; release 3 bỏ ghi và xoá `note`.

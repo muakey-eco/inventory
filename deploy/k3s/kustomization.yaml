@@ -1,0 +1,79 @@
+# Production của kho trên k3s (ADR 0009, 0010). Không có staging nên không chia
+# base/overlays.
+#
+# BẢN GỐC LÀ BẢN NÀY. Argo CD không đọc repo này: nó đồng bộ từ bản chép ở
+# `k3s-ops/applications/inventory/`. Sửa ở đây trước, rồi chép NGUYÊN THƯ MỤC
+# sang. `newTag` và host ở đây là giá trị thật, nên bản này luôn khớp với thứ
+# đang chạy. Dựng lần đầu, deploy, rollback: mục "Chạy trên k3s" của README.
+#
+# Một image, mỗi tiến trình một workload, khác nhau đúng ở `args`: `web`,
+# `queue`, `scheduler`, và Job `migrate`. Postgres và bucket S3 nằm NGOÀI
+# cluster.
+#
+# `application.yaml` cố ý KHÔNG nằm trong `resources`, xem ghi chú ở đó.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: inventory
+
+# Chỉ gắn vào metadata. Selector khai tường minh ở từng file, để Service và PDB
+# không chọn nhầm pod `queue` hay `scheduler`.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: inventory
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - externalsecret.yaml
+  - migrate.yaml
+  - web.yaml
+  - pdb.yaml
+  - queue.yaml
+  - scheduler.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+
+# Phần chung (image, biến môi trường, securityContext) viết MỘT lần trong
+# `common.yaml` và vá vào mọi workload mang nhãn `inventory/image: app`.
+# Kustomize không có YAML anchor; patch theo nhãn là thứ thay thế nó.
+patches:
+  - path: common.yaml
+    target:
+      kind: Deployment
+      labelSelector: inventory/image=app
+  - path: common-job.yaml
+    target:
+      kind: Job
+      labelSelector: inventory/image=app
+  # Mọi Deployment chờ migration CHẠY XONG rồi kiểm khoá. Job không nhận patch
+  # này: nó là thứ được chờ.
+  - path: wait-for-migrate.yaml
+    target:
+      kind: Deployment
+      labelSelector: inventory/image=app
+
+# SHA ngắn đang chạy, do `scripts/build-image.sh` in ra. Deploy là commit đổi dòng
+# này rồi chép sang k3s-ops; rollback là đặt lại SHA cũ, nhưng chỉ lùi an toàn
+# được một release (migration theo expand/contract, AGENTS.md). Không bao giờ
+# `latest`: Argo CD so manifest chứ không so digest.
+#
+# `muakey/inventory` là tên node kéo qua mirror về Registry nội bộ (k3s-ops
+# ADR 0001). `0000000` là chỗ giữ: chép sang k3s-ops khi đã thay bằng SHA thật.
+images:
+  - name: inventory
+    newName: muakey/inventory
+    newTag: "0000000"
+
+configMapGenerator:
+  - name: inventory-config
+    envs:
+      - config.env
+    options:
+      annotations:
+        # Cùng đợt với ExternalSecret: Job `migrate` cần cả hai.
+        argocd.argoproj.io/sync-wave: "-1"
+        # Argo prune ConfigMap cũ sau cùng, khi rollout đã xong, để pod cũ
+        # không mất env giữa chừng.
+        argocd.argoproj.io/sync-options: PruneLast=true

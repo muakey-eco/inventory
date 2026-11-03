@@ -45,8 +45,8 @@ Việc trao nội dung **Slot** cho khách. Đây là thời điểm hàng rời
 _Avoid_: bán (kho không quản lý việc bán)
 
 **Xuất hàng** (Outbound):
-Nửa công việc đưa hàng ra khỏi kho: nhận đơn của **Kênh bán** thành **Phiếu xuất**, **Giao hàng**, rồi xử lý **Báo lỗi** và **Đổi hàng** sau khi giao. Là phần việc của **Vai trò** Bán hàng, không phải tên của Vai trò đó.
-_Avoid_: bán hàng (đó là tên **Vai trò**), xuất kho (dễ nhầm với **Tạm dừng xuất kho**)
+Nửa công việc đưa hàng ra khỏi kho: nhận đơn của **Kênh bán** thành **Phiếu xuất**, **Giao hàng**, rồi xử lý **Báo lỗi** và **Đổi hàng** sau khi giao.
+_Avoid_: bán hàng (từng là tên một Vai trò, kho nay không có Vai trò), xuất kho (dễ nhầm với **Tạm dừng xuất kho**)
 
 **Phiếu xuất** (Dispatch):
 Một đơn cần giao từ một **Kênh bán**, gồm một hoặc nhiều **Dòng xuất**, định danh bằng mã đơn ngoài duy nhất trong kênh bán đó. Ghi thông tin khách dạng văn bản tự do để tra cứu khi bảo hành. Có trạng thái Đang giữ, Hết hạn giữ, Hoàn tất hoặc Đã huỷ; huỷ phiếu thì nhả mọi **Slot** đang giữ. Phiếu Hết hạn giữ đã nhả Slot nhưng vẫn giao được nếu giữ lại đủ hàng; Đã huỷ là trạng thái cuối. Mã đơn ngoài bị chiếm vĩnh viễn khi phiếu được tạo, kể cả khi phiếu bị huỷ. Phiếu xuất giữ đủ số lượng cho mọi Dòng xuất hoặc thất bại toàn bộ, không giao thiếu.
@@ -78,7 +78,7 @@ Văn bản để ghép nội dung một **Slot** thành tin nhắn gửi khách,
 Nguồn phát sinh đơn cần giao, do quản trị khai báo, loại thủ công (Shopee, Facebook, Zalo...) hoặc API (website). Mỗi kênh quy định có bắt buộc mã đơn ngoài không; nếu không bắt buộc và nhân viên để trống thì mã được tự sinh. Kênh loại API gọi vào kho bằng **Khoá API**, quy định hạn **Giữ hàng** (mặc định 15 phút) và có bắt buộc **Giá bán** không (mặc định có).
 
 **Khoá API** (API key):
-Bí mật mà một **Kênh bán** loại API dùng để gọi vào kho. Chỉ hiển thị một lần khi tạo; chỉ **Quản trị** tạo, thu hồi hoặc xoay khoá, và mỗi thao tác đó ghi vào **Nhật ký bảo mật**. Một kênh có thể có hai khoá cùng hoạt động trong lúc xoay. Là "ai" trong **Nhật ký xem mã** khi nội dung được trả qua API.
+Bí mật mà một **Kênh bán** loại API dùng để gọi vào kho. Chỉ hiển thị một lần khi tạo; chỉ người có **Quyền** quản Khoá API tạo, thu hồi hoặc xoay khoá, và mỗi thao tác đó ghi vào **Nhật ký bảo mật**. Một kênh có thể có hai khoá cùng hoạt động trong lúc xoay. Là "ai" trong **Nhật ký xem mã** khi nội dung được trả qua API.
 _Avoid_: token (khi nói về nghiệp vụ)
 
 **Hạn sử dụng** (Expiry date):
@@ -93,10 +93,10 @@ Việc shop tự loại một **Slot** hoặc **Đơn vị hàng** khỏi vòng 
 _Avoid_: xoá, thu hồi về kho
 
 **Đánh dấu Lỗi** (Mark defective):
-Quản trị chuyển một **Đơn vị hàng** sang Lỗi mà không cần **Báo lỗi** của khách, khi nhà cung cấp thu hồi hoặc phát hiện hỏng trong kho. Vẫn sinh danh sách **Lần giao bị ảnh hưởng**.
+Nhân viên có **Quyền** Đánh dấu Lỗi chuyển một **Đơn vị hàng** sang Lỗi mà không cần **Báo lỗi** của khách, khi nhà cung cấp thu hồi hoặc phát hiện hỏng trong kho. Vẫn sinh danh sách **Lần giao bị ảnh hưởng**.
 
 **Khôi phục** (Restore):
-Quản trị đưa một **Đơn vị hàng** Lỗi về Hoạt động, kèm lý do, khi nhà cung cấp sửa được hàng. Đơn vị hàng không còn tính vào **Tỉ lệ lỗi** và bị gỡ khỏi **Khiếu nại nhà cung cấp** chưa giải quyết; **Báo lỗi** và **Đổi hàng** đã làm giữ nguyên.
+Nhân viên có **Quyền** Đánh dấu Lỗi đưa một **Đơn vị hàng** Lỗi về Hoạt động, kèm lý do, khi nhà cung cấp sửa được hàng. Đơn vị hàng không còn tính vào **Tỉ lệ lỗi** và bị gỡ khỏi **Khiếu nại nhà cung cấp** chưa giải quyết; **Báo lỗi** và **Đổi hàng** đã làm giữ nguyên.
 
 **Chi phí đổi hàng** (Replacement cost):
 **Giá vốn** của **Slot** giao ra trong một **Đổi hàng**. Gắn với **Nhà cung cấp** và **Sản phẩm** của **Đơn vị hàng** lỗi, không trừ vào **Lãi gộp** của **Phiếu xuất** gốc mà trừ vào **Lãi ròng kho**.
@@ -131,7 +131,7 @@ Số **Slot** do **Sản phẩm** khai báo tuỳ chọn; khi **Tồn bán đư�
 Của một **Nhà cung cấp**: số **Đơn vị hàng** Lỗi chia cho số Đơn vị hàng đã giao ít nhất một **Slot**. Tử số gồm Lỗi từ **Báo lỗi** có **Phạm vi lỗi** cả Đơn vị hàng và Lỗi do **Đánh dấu Lỗi**, không gồm hàng đã **Khôi phục**. Không gồm **Giao thay** hay Báo lỗi chỉ Slot. Tính theo lứa nhập: tỉ lệ lỗi của một khoảng thời gian xét các Đơn vị hàng có **Lô nhập** xác nhận trong khoảng đó, nên con số của một kỳ cũ còn tăng dần. Dòng bị bỏ vì lỗi định dạng hoặc trùng khi nhập không tính vào Tỉ lệ lỗi.
 
 **Báo lỗi** (Defect report):
-Ghi nhận một **Slot** đã giao (của **Tài khoản** hoặc **Mã dùng một lần**) nhưng không dùng được, do nhân viên tạo trong **Hạn bảo hành** (ngoài hạn, hoặc Sản phẩm không có bảo hành, thì chỉ **Quản trị** tạo kèm lý do). Mỗi Slot có nhiều nhất một Báo lỗi Chờ xác minh hoặc Xác nhận; tạo lại được sau Bác bỏ. Có trạng thái Chờ xác minh, Xác nhận hoặc Bác bỏ. Trong lúc Chờ xác minh, các Slot còn trong kho của cùng **Đơn vị hàng** tạm ngừng bán. Khi Xác nhận, người xác minh chọn **Phạm vi lỗi**. Báo lỗi đã Xác nhận có **Kết quả xử lý**: Chờ đổi, Đã đổi hoặc Không đổi.
+Ghi nhận một **Slot** đã giao (của **Tài khoản** hoặc **Mã dùng một lần**) nhưng không dùng được, do nhân viên tạo trong **Hạn bảo hành** (ngoài hạn, hoặc Sản phẩm không có bảo hành, thì chỉ người có **Quyền** Vượt hạn tạo, kèm lý do). Mỗi Slot có nhiều nhất một Báo lỗi Chờ xác minh hoặc Xác nhận; tạo lại được sau Bác bỏ. Có trạng thái Chờ xác minh, Xác nhận hoặc Bác bỏ. Trong lúc Chờ xác minh, các Slot còn trong kho của cùng **Đơn vị hàng** tạm ngừng bán. Khi Xác nhận, người xác minh chọn **Phạm vi lỗi**. Báo lỗi đã Xác nhận có **Kết quả xử lý**: Chờ đổi, Đã đổi hoặc Không đổi.
 _Avoid_: bảo hành (khi nói về một lần khách báo)
 
 **Phạm vi lỗi** (Defect scope):
@@ -141,7 +141,7 @@ Mức mà một **Báo lỗi** đã Xác nhận ảnh hưởng: **cả Đơn v�
 Lần **Giao hàng** khác của một **Đơn vị hàng** vừa chuyển sang Lỗi, hoặc vừa bị **Huỷ hàng** cả đơn vị trong một **Giao thay**; hoặc lần giao **Tài khoản** còn trong **Hạn bảo hành** khi nội dung kho bị coi là đã lộ. Hệ thống liệt kê để nhân viên chủ động liên hệ khách; với Đơn vị hàng Lỗi thì tạo được **Báo lỗi** hàng loạt, tự Xác nhận. Không tự Báo lỗi hay **Đổi hàng**.
 
 **Đổi hàng** (Replacement):
-Giao một **Slot** khác thay cho **Slot** có **Báo lỗi** đã Xác nhận, có liên kết với lần **Giao hàng** gốc và kế thừa **Hạn bảo hành** của nó. Mặc định cùng **Sản phẩm** (sang Sản phẩm khác phải có lý do). Slot được chọn theo **Thứ tự xuất** nhưng thay **Hạn còn lại tối thiểu** bằng điều kiện **Hạn sử dụng** phủ hết Hạn bảo hành kế thừa; không có Slot phủ đủ thì nhân viên chấp nhận Slot hạn ngắn hơn sau cảnh báo, và Hạn bảo hành không vượt Hạn sử dụng của Slot đó. Từ lần đổi thứ 3 trong cùng chuỗi, Bán hàng chỉ Đổi hàng được sau khi **Quản trị** duyệt. Kho không xử lý hoàn tiền; khách nhận hoàn tiền ngoài kho thì Báo lỗi có kết quả Không đổi.
+Giao một **Slot** khác thay cho **Slot** có **Báo lỗi** đã Xác nhận, có liên kết với lần **Giao hàng** gốc và kế thừa **Hạn bảo hành** của nó. Mặc định cùng **Sản phẩm** (sang Sản phẩm khác phải có lý do). Slot được chọn theo **Thứ tự xuất** nhưng thay **Hạn còn lại tối thiểu** bằng điều kiện **Hạn sử dụng** phủ hết Hạn bảo hành kế thừa; không có Slot phủ đủ thì nhân viên chấp nhận Slot hạn ngắn hơn sau cảnh báo, và Hạn bảo hành không vượt Hạn sử dụng của Slot đó. Từ lần đổi thứ 3 trong cùng chuỗi, Đổi hàng phải được duyệt trước, trừ khi chính người đổi có **Quyền** duyệt Đổi hàng. Kho không xử lý hoàn tiền; khách nhận hoàn tiền ngoài kho thì Báo lỗi có kết quả Không đổi.
 
 **Khiếu nại nhà cung cấp** (Supplier claim):
 Việc đòi một **Nhà cung cấp** bồi hoàn cho một hoặc nhiều **Đơn vị hàng** Lỗi của họ. Có trạng thái Nháp, Đã gửi, Đã giải quyết hoặc Đã huỷ. Khi giải quyết, mỗi Đơn vị hàng có kết quả riêng: bồi hoàn tiền (kèm số tiền và ngày nhận tiền; **Lãi ròng kho** vẫn tính theo ngày giải quyết), hàng thay thế (vào kho bằng **Lô nhập** liên kết với Khiếu nại, không quá số Đơn vị hàng được thay) hoặc bị từ chối. Khiếu nại Đã gửi mà mọi Đơn vị hàng đã **Khôi phục** thì tự huỷ. Không bắt buộc khiếu nại mọi Đơn vị hàng Lỗi.
@@ -150,8 +150,8 @@ Việc đòi một **Nhà cung cấp** bồi hoàn cho một hoặc nhiều **Đ
 Đánh dấu một **Sản phẩm** không còn được giữ hàng hay giao mới, nhưng vẫn dùng được cho **Đổi hàng** và **Giao thay** của các lần giao cũ của chính nó.
 
 **Nhập hàng** (Intake):
-Nửa công việc đưa hàng vào kho: làm việc với **Nhà cung cấp**, tạo **Lô nhập**, và đòi bồi hoàn cho hàng lỗi qua **Khiếu nại nhà cung cấp**. Là phần việc của **Vai trò** Nhập kho, không phải tên của Vai trò đó.
-_Avoid_: nhập kho (đó là tên **Vai trò**)
+Nửa công việc đưa hàng vào kho: làm việc với **Nhà cung cấp**, tạo **Lô nhập**, và đòi bồi hoàn cho hàng lỗi qua **Khiếu nại nhà cung cấp**.
+_Avoid_: nhập kho (từng là tên một Vai trò, kho nay không có Vai trò)
 
 **Lô nhập** (Batch):
 Một lần nhập hàng vào kho từ một **Nhà cung cấp**, gồm một hoặc nhiều **Dòng nhập**. Chỉ vào kho khi nhân viên xác nhận sau bước xem trước; ghi lại số dòng bị bỏ vì lỗi hoặc trùng. Khi còn Chờ xác nhận thì sửa được phần chứng từ và **Giá trị áp cho Đơn vị hàng** rồi kiểm tra lại, nhưng nội dung, **Nhà cung cấp** và **Sản phẩm** thì không (ADR 0007).
@@ -164,7 +164,7 @@ Phần của một **Lô nhập** dành cho đúng một **Sản phẩm**: một
 _Avoid_: giá trị ghi đè, giá trị mặc định của Dòng nhập
 
 **Huỷ nhập** (Import reversal):
-Rút lại hàng đã nhập nhầm, coi như chưa từng vào kho: giải phóng **Khoá chống trùng** để nhập lại được, nhưng vẫn giữ bản ghi. Làm theo **Dòng nhập** hoặc cả **Lô nhập**, chỉ **Quản trị**; chỉ huỷ **Đơn vị hàng** mà mọi **Slot** vẫn Còn hàng, phần còn lại ở lại. Hàng Đã huỷ nhập không tính là tồn.
+Rút lại hàng đã nhập nhầm, coi như chưa từng vào kho: giải phóng **Khoá chống trùng** để nhập lại được, nhưng vẫn giữ bản ghi. Làm theo **Dòng nhập** hoặc cả **Lô nhập**, chỉ người có **Quyền** Huỷ nhập; chỉ huỷ **Đơn vị hàng** mà mọi **Slot** vẫn Còn hàng, phần còn lại ở lại. Hàng Đã huỷ nhập không tính là tồn.
 _Avoid_: xoá lô, Huỷ hàng (Huỷ hàng không giải phóng Khoá chống trùng)
 
 **Nhà cung cấp** (Supplier):
@@ -176,21 +176,21 @@ Giá shop trả cho một **Đơn vị hàng**, ghi khi nhập theo **Lô nhập
 **Sổ biến động kho** (Stock ledger):
 Nhật ký chỉ-ghi-thêm mọi lần chuyển trạng thái của **Slot** và **Đơn vị hàng**: ai, khi nào, từ trạng thái nào sang trạng thái nào, lý do. Tách biệt với **Nhật ký xem mã**.
 
-**Vai trò** (Role):
-Nhóm quyền của một nhân viên. Có ba vai trò: **Quản trị** (chủ shop, mọi quyền), **Nhập kho** (nhập hàng, làm việc với **Nhà cung cấp**) và **Bán hàng** (xuất kho và xử lý sau giao). Một nhân viên có thể mang nhiều vai trò; không gán quyền lẻ cho từng người. Vai trò được gán trên platform, kho chỉ nhận theo, nên việc còn ít nhất một Quản trị là trách nhiệm của người quản platform, kho không chặn được (ADR 0011). Kho biết Vai trò của một nhân viên theo lần cuối kho thấy họ; trang Nhân viên hiện Vai trò theo lần đó.
-_Trong code_: `Role::Admin`, `Role::Importer`, `Role::Sale`, giá trị `admin`, `importer`, `sale`. `admin` là **Quản trị** trong app, không phải **Người vận hành server**.
+**Quyền** (Permission):
+Một việc cụ thể mà nhân viên được làm trong kho, ví dụ xác nhận **Lô nhập** hay duyệt **Đổi hàng**. Mỗi thao tác kiểm đúng Quyền của nó; không Quyền nào bao trùm các Quyền khác, kể cả với chủ shop. Quyền được cấp trên platform; nhân viên có Quyền qua đường nào (gom theo nhóm hay gán lẻ) là chuyện của platform, kho không phân biệt (ADR 0012). Kho biết Quyền của một nhân viên theo lần cuối kho thấy họ; trang Nhân viên hiện Quyền theo lần đó.
+_Avoid_: Vai trò (kho không có khái niệm nhóm quyền; nhóm quyền chỉ sống trên platform)
 
 **Ngữ cảnh xem mã** (Reveal context):
-Bản ghi mà qua đó nội dung đầy đủ của một **Slot** được hiển thị hoặc tải về: một lần **Giao hàng**, **Đổi hàng**, **Báo lỗi**, **Khiếu nại nhà cung cấp** hoặc **Lô nhập**. Lý do xem suy ra từ ngữ cảnh. Nội dung chỉ xem được qua một ngữ cảnh, trừ **Quản trị** xem hàng Còn hàng kèm lý do tự do.
+Bản ghi mà qua đó nội dung đầy đủ của một **Slot** được hiển thị hoặc tải về: một lần **Giao hàng**, **Đổi hàng**, **Báo lỗi**, **Khiếu nại nhà cung cấp** hoặc **Lô nhập**. Lý do xem suy ra từ ngữ cảnh. Nội dung chỉ xem được qua một ngữ cảnh, trừ người có **Quyền** xem hàng Còn hàng, kèm lý do tự do.
 
 **Nhật ký xem mã** (Reveal log):
-Nhật ký chỉ-ghi-thêm mỗi lần nội dung đầy đủ bị hiển thị hoặc tải về: ai (nhân viên hoặc **Khoá API**), khi nào, Slot nào, **Ngữ cảnh xem mã**, lý do. Không chứa nội dung mã, không ghi thao tác Copy, trừ Copy tất cả khi màn kết quả chỉ hiện dạng che (từ 50 **Slot** trở lên); lưu vĩnh viễn, chỉ **Quản trị** xem được.
+Nhật ký chỉ-ghi-thêm mỗi lần nội dung đầy đủ bị hiển thị hoặc tải về: ai (nhân viên hoặc **Khoá API**), khi nào, Slot nào, **Ngữ cảnh xem mã**, lý do. Không chứa nội dung mã, không ghi thao tác Copy, trừ Copy tất cả khi màn kết quả chỉ hiện dạng che (từ 50 **Slot** trở lên); lưu vĩnh viễn, chỉ người có **Quyền** xem nhật ký xem được.
 
 **Nhật ký bảo mật** (Security log):
-Nhật ký chỉ-ghi-thêm các sự kiện về quyền truy cập: đăng nhập, nhân viên xuất hiện lần đầu, **Khoá nhân viên** hoặc mở khoá, **Mất quyền theo platform** hoặc có lại quyền, **Vai trò** đổi theo platform (ghi điều kho nhận thấy; ai bấm bên platform thì nằm ở nhật ký của platform), tạo, thu hồi hoặc xoay **Khoá API**, đăng ký dấu vân tay hoặc xoay khoá mã hoá của kho, bật hoặc tắt **Tạm dừng xuất kho**. Không bao giờ chứa giá trị khoá. Lưu vĩnh viễn, chỉ **Quản trị** xem được. Đăng nhập bị từ chối và bằng chứng MFA không có ở đây: platform từ chối trước khi tới kho, nên chúng nằm ở nhật ký của platform.
+Nhật ký chỉ-ghi-thêm các sự kiện về quyền truy cập: đăng nhập, nhân viên xuất hiện lần đầu, **Khoá nhân viên** hoặc mở khoá, **Mất quyền theo platform** hoặc có lại quyền, **Quyền** đổi theo platform (ghi Quyền được thêm và bị bớt mà kho nhận thấy; ai bấm bên platform thì nằm ở nhật ký của platform), tạo, thu hồi hoặc xoay **Khoá API**, đăng ký dấu vân tay hoặc xoay khoá mã hoá của kho, bật hoặc tắt **Tạm dừng xuất kho**. Không bao giờ chứa giá trị khoá. Lưu vĩnh viễn, chỉ người có **Quyền** xem nhật ký xem được. Đăng nhập bị từ chối và bằng chứng MFA không có ở đây: platform từ chối trước khi tới kho, nên chúng nằm ở nhật ký của platform.
 
 **Khoá nhân viên** (Deactivate staff):
-Công tắc khẩn cấp của **Quản trị** tại kho: chặn một nhân viên, có hiệu lực ngay kể cả phiên đang mở, độc lập với platform và chỉ Quản trị (hoặc **Người vận hành server**) mở lại được. Khác **Mất quyền theo platform**. Nhân viên không bao giờ bị xoá vì các nhật ký tham chiếu tới họ.
+Công tắc khẩn cấp tại kho của người có **Quyền** quản Nhân viên: chặn một nhân viên, có hiệu lực ngay kể cả phiên đang mở, độc lập với platform và chỉ người có Quyền đó (hoặc **Người vận hành server**) mở lại được. Không khoá được người cuối cùng đang hoạt động có Quyền đó, vì mất họ thì không còn ai mở khoá. Khác **Mất quyền theo platform**. Nhân viên không bao giờ bị xoá vì các nhật ký tham chiếu tới họ.
 _Avoid_: xoá nhân viên
 
 **Mất quyền theo platform** (Revoked by platform):
@@ -198,15 +198,15 @@ Nhân viên không vào được kho vì người dùng của họ trên platfor
 _Avoid_: khoá, vô hiệu hoá (đó là **Khoá nhân viên**)
 
 **Người vận hành server** (Server operator):
-Người đọc được khoá mã hoá của kho ở bất kỳ chỗ nào nó nằm: quản trị cụm hoặc node chạy kho, người đọc được secret của kho trong cụm, hoặc người đọc được nơi lưu bí mật mà cụm lấy khoá về. Đọc được mọi nội dung mà không đi qua **Nhật ký xem mã**. Không phải một **Vai trò** trong app. Trong shop, chỉ chủ shop giữ lâu dài; người khác chỉ được cấp theo từng đợt và bị thu hồi khi xong việc. Người quản cụm và Infisical của tổ chức giữ quyền lâu dài, là đánh đổi có chủ ý.
-_Avoid_: admin (dễ nhầm với **Quản trị**)
+Người đọc được khoá mã hoá của kho ở bất kỳ chỗ nào nó nằm: quản trị cụm hoặc node chạy kho, người đọc được secret của kho trong cụm, hoặc người đọc được nơi lưu bí mật mà cụm lấy khoá về. Đọc được mọi nội dung mà không đi qua **Nhật ký xem mã**. Không phải một **Quyền** trong app. Trong shop, chỉ chủ shop giữ lâu dài; người khác chỉ được cấp theo từng đợt và bị thu hồi khi xong việc. Người quản cụm và Infisical của tổ chức giữ quyền lâu dài, là đánh đổi có chủ ý.
+_Avoid_: admin (dễ nhầm với chủ shop trong app)
 
 **Tạm dừng xuất kho** (Dispatch freeze):
-Trạng thái toàn kho trong đó không **Kênh bán** nào, kể cả kênh API, được **Giữ hàng** hay **Giao hàng**. Chỉ **Quản trị** bật hoặc tắt, kèm lý do. Kho luôn ở trạng thái này sau khi khôi phục từ backup, cho tới khi Quản trị đối chiếu xong các đơn phát sinh sau mốc khôi phục; cũng được bật khi nghi nội dung kho bị lộ.
+Trạng thái toàn kho trong đó không **Kênh bán** nào, kể cả kênh API, được **Giữ hàng** hay **Giao hàng**. Chỉ người có **Quyền** Tạm dừng xuất kho bật hoặc tắt, kèm lý do. Kho luôn ở trạng thái này sau khi khôi phục từ backup, cho tới khi người có Quyền đó đối chiếu xong các đơn phát sinh sau mốc khôi phục; cũng được bật khi nghi nội dung kho bị lộ.
 _Avoid_: bảo trì, khoá kho
 
 **Ghi nhận giao bù** (Recorded lost delivery):
-Quản trị ghi lại một lần **Giao hàng** đã thực sự xảy ra nhưng bị mất khỏi kho do khôi phục từ backup, bằng cách chọn đích danh **Slot** qua **Khoá chống trùng**, kèm lý do. Là ngoại lệ duy nhất cho việc Slot được chọn theo **Thứ tự xuất**.
+Người có **Quyền** Tạm dừng xuất kho ghi lại một lần **Giao hàng** đã thực sự xảy ra nhưng bị mất khỏi kho do khôi phục từ backup, bằng cách chọn đích danh **Slot** qua **Khoá chống trùng**, kèm lý do. Là ngoại lệ duy nhất cho việc Slot được chọn theo **Thứ tự xuất**.
 
 ## Relationships
 
@@ -254,7 +254,7 @@ Quản trị ghi lại một lần **Giao hàng** đã thực sự xảy ra như
 - Lọc **Nhà cung cấp** trên báo cáo Lãi/lỗ gặp đúng vấn đề của báo cáo Nhập/xuất: một Dòng xuất có thể gồm Slot của nhiều Nhà cung cấp. Đã chốt: khác báo cáo Nhập/xuất (ẩn hẳn cột Giá bán), báo cáo Lãi/lỗ **chia đều Giá bán theo Slot**, vì ở đây bỏ doanh thu đi thì Lãi gộp của Nhà cung cấp mất nghĩa hoàn toàn, còn chia theo Slot vẫn là một phép quy đổi nói được.
 - Hàng thay thế từ **Khiếu nại nhà cung cấp** có thể bị coi là một khoản bồi hoàn trừ vào lỗ. Đã chốt: trong báo cáo lỗ theo Nhà cung cấp nó chỉ là cột tham khảo (đếm **Đơn vị hàng**), không trừ vào lỗ ròng, vì hàng ấy vào kho với **Giá vốn** 0 nên đã tự phản ánh khi bán; trừ thêm lần nữa là tính hai lần.
 - Lỗ "của một **Nhà cung cấp**" có thể hiểu là mọi **Tổn thất** của hàng họ giao. Đã chốt: chỉ gồm **Giá vốn** hàng Lỗi và **Chi phí đổi hàng**; Tổn thất **Huỷ hàng** (giao nhầm, lộ nội dung, ngừng kinh doanh lô) và Tổn thất hết hạn là chuyện của shop, tính cho Nhà cung cấp là đổ oan.
-- "nhập kho" và "bán hàng" vừa là tên **Vai trò**, vừa có thể hiểu là công việc. Đã chốt: công việc gọi là **Nhập hàng** và **Xuất hàng**; **Nhập kho** và **Bán hàng** chỉ là tên Vai trò. Hai cặp từ này cố tình khác nhau để một câu nói ra là biết đang nói về người hay về việc.
+- "nhập kho" và "bán hàng" từng vừa là tên **Vai trò**, vừa có thể hiểu là công việc. Đã chốt: công việc gọi là **Nhập hàng** và **Xuất hàng**. Kho nay không có Vai trò (ADR 0012): **Quản trị**, **Nhập kho**, **Bán hàng** chỉ còn là tên nhóm **Quyền** trên platform, và mọi quy tắc của kho nói theo Quyền, không theo nhóm.
 - "loại sản phẩm" từng nghĩa là **Mã dùng một lần** hay **Tài khoản**. Đã chốt: tách làm hai. **Dạng hàng** là hàng nằm trong kho dưới hình thức nào, **Loại sản phẩm** là khuôn khai **Trường nội dung** dùng chung cho nhiều **Sản phẩm**. Câu hỏi "sản phẩm này loại gì?" từ nay trả lời bằng tên Loại sản phẩm, không phải Mã dùng một lần hay Tài khoản.
 - Có **Loại sản phẩm** rồi thì dễ tưởng sửa Loại là sửa được mọi **Sản phẩm** thuộc nó. Đã chốt: chỉ thêm trường tuỳ chọn và đổi tên hiển thị mới áp xuống; mọi thay đổi chạm vào dữ liệu đã lưu (kiểu trường, cờ nhạy cảm, **Khoá chống trùng**, chuẩn hoá, **Dạng hàng**, xoá trường) bị từ chối trọn gói khi Loại đã có Sản phẩm có hàng, chứ không áp cho những Sản phẩm áp được (ADR 0004). Hệ quả cố ý: một Sản phẩm chưa có hàng vẫn bị chặn vì Sản phẩm anh em cùng Loại đã có hàng.
 - **Sản phẩm** dùng chung **Trường nội dung** nhưng cần hướng dẫn kích hoạt riêng. Đã chốt: chỉ **Mẫu giao hàng** được Sản phẩm ghi đè, vì nó chi phối văn bản gửi khách chứ không chi phối dữ liệu đã lưu; mọi khai báo khác của **Loại sản phẩm** thì Sản phẩm không lệch được.

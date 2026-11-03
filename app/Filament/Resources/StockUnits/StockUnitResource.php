@@ -121,7 +121,7 @@ class StockUnitResource extends Resource
             Section::make('Lần giao bị ảnh hưởng')
                 ->description('Đơn vị hàng đang Lỗi: các lần giao còn Đã giao. Hãy liên hệ khách; hệ thống không tự Đổi hàng.')
                 // Có thông tin khách: chỉ Bán hàng và Quản trị.
-                ->visible(fn (StockUnit $record): bool => $record->status === StockUnitStatus::Defective && app(RoleGate::class)->allows(InventoryAction::actor(), Role::BanHang))
+                ->visible(fn (StockUnit $record): bool => $record->status === StockUnitStatus::Defective && app(RoleGate::class)->allows(InventoryAction::actor(), Role::Sale))
                 ->schema([
                     RepeatableEntry::make('affected_deliveries')
                         ->hiddenLabel()
@@ -232,6 +232,6 @@ class StockUnitResource extends Resource
 
     private static function seesCost(): bool
     {
-        return app(RoleGate::class)->allows(InventoryAction::actor(), Role::NhapKho);
+        return app(RoleGate::class)->allows(InventoryAction::actor(), Role::Importer);
     }
 }

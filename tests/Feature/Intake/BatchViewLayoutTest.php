@@ -12,7 +12,6 @@ use App\Inventory\Intake\BatchLineDraft;
 use App\Inventory\Intake\BatchStatus;
 use App\Models\Batch;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Support\Facades\DB;
@@ -30,10 +29,9 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('intake');
     Repeater::fake();
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->product = productOf(
         StockForm::OneTimeCode,

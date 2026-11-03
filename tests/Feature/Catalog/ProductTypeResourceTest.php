@@ -8,14 +8,12 @@ use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Models\ProductType;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->seed(RoleSeeder::class);
     $this->undoRepeaterFake = Repeater::fake();
 });
 
@@ -66,13 +64,13 @@ it('mọi Vai trò xem được danh sách Loại sản phẩm, chỉ Quản tr�
     Livewire::test(ListProductTypes::class)
         ->{$canCreate ? 'assertActionVisible' : 'assertActionHidden'}(CreateAction::class);
 })->with([
-    'Quản trị' => [Role::Owner, true],
-    'Nhập kho' => [Role::NhapKho, false],
-    'Bán hàng' => [Role::BanHang, false],
+    'Quản trị' => [Role::Admin, true],
+    'Nhập kho' => [Role::Importer, false],
+    'Bán hàng' => [Role::Sale, false],
 ]);
 
 it('Quản trị khai một Loại sản phẩm kèm Trường nội dung, xong về danh sách', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
 
     Livewire::test(CreateProductType::class)
         ->fillForm(cardTypeForm())
@@ -90,7 +88,7 @@ it('Quản trị khai một Loại sản phẩm kèm Trường nội dung, xong 
 });
 
 it('lỗi khai báo ở trang Tạo thành thông báo, không ghi gì và ở lại form', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     cardProductType();
 
     Livewire::test(CreateProductType::class)
@@ -103,7 +101,7 @@ it('lỗi khai báo ở trang Tạo thành thông báo, không ghi gì và ở l
 });
 
 it('trang Sửa xem trước thay đổi và nêu Sản phẩm chịu ảnh hưởng trước khi ghi', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     $type = cardProductType();
     productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
 
@@ -128,7 +126,7 @@ it('trang Sửa xem trước thay đổi và nêu Sản phẩm chịu ảnh hư�
 });
 
 it('xác nhận rồi thì thay đổi áp cho mọi Sản phẩm của Loại', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     $type = cardProductType();
     $garena = productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
     $zing = productIn($type, 'Thẻ Zing 20k', 'ZING-20K');
@@ -153,7 +151,7 @@ it('xác nhận rồi thì thay đổi áp cho mọi Sản phẩm của Loại',
 });
 
 it('Loại đã có Sản phẩm có hàng: hộp cảnh báo nêu đích danh Sản phẩm chặn, và bản sửa bị từ chối trọn gói', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     $type = cardProductType();
     withStock(productIn($type, 'Thẻ Garena 100k', 'GARENA-100K'));
 
@@ -184,7 +182,7 @@ it('Loại đã có Sản phẩm có hàng: hộp cảnh báo nêu đích danh S
 });
 
 it('trang Sửa của Loại chưa có hàng không hiện hộp cảnh báo', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     $type = cardProductType();
     productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
 
@@ -193,7 +191,7 @@ it('trang Sửa của Loại chưa có hàng không hiện hộp cảnh báo', f
 });
 
 it('Quản trị Ngừng dùng Loại; Loại đang có Sản phẩm không có nút xoá', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     $type = cardProductType();
     productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
 
@@ -206,7 +204,7 @@ it('Quản trị Ngừng dùng Loại; Loại đang có Sản phẩm không có 
 });
 
 it('Quản trị xoá được Loại chưa Sản phẩm nào dùng, xoá xong về danh sách', function () {
-    $this->actingAs(staffMember(Role::Owner));
+    $this->actingAs(staffMember(Role::Admin));
     $type = cardProductType();
 
     Livewire::test(EditProductType::class, ['record' => $type->getRouteKey()])
@@ -228,6 +226,6 @@ it('Nhập kho và Bán hàng không sửa, không Ngừng dùng, không xoá đ
         ->assertActionHidden(TestAction::make('discontinue')->table($type))
         ->assertActionHidden(TestAction::make('delete')->table($type));
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);

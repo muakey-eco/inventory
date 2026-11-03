@@ -2,23 +2,19 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
+     *
+     * Không seed nhân viên hay Vai trò: nhân viên sinh ở lần đầu đăng nhập qua platform, Vai trò
+     * là Permission trên platform (ADR 0011). Dev đăng nhập bằng tài khoản thật qua App thử
+     * `inventory-dev`.
      */
     public function run(): void
     {
-        $this->call(RoleSeeder::class);
-
-        // Production có nhân viên thật từ Authentik; nhân viên giả chỉ để đăng nhập dev.
-        if (app()->isLocal()) {
-            $this->call(DevStaffSeeder::class);
-        }
+        //
     }
 }

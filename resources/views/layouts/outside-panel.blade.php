@@ -5,7 +5,7 @@
 
     Trang không tự chuyển hướng. Layout có nạp JS của Livewire và Filament, nên bật thứ gì tự gửi
     request trên mọi trang của panel (`->spa()`, `->databaseNotifications()` có poll) thì soát lại
-    trang bị từ chối: nó không được dẫn tới một vòng lặp kho ↔ Authentik.
+    trang đăng nhập không thành: nó không được dẫn tới một vòng lặp kho ↔ platform.
 --}}
 {{-- `livewire` đi qua data của @component như Livewire vẫn làm: truyền bằng attribute thì @props của layout xoá mất. --}}
 @component('filament-panels::components.layout.simple', ['livewire' => new \App\Filament\Support\OutsidePanelPage(trim($__env->yieldContent('title')))])

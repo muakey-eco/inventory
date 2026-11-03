@@ -28,18 +28,16 @@ use App\Models\Slot;
 use App\Models\StockUnit;
 use App\Models\SupplierClaimUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->stocker = staffMember(Role::NhapKho);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->stocker = staffMember(Role::Importer);
+    $this->seller = staffMember(Role::Sale);
     $this->claims = app(SupplierClaims::class);
     $this->netflix = productOf(
         StockForm::Account,

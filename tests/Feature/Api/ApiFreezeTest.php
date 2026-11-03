@@ -16,7 +16,6 @@ use App\Models\Delivery;
 use App\Models\Dispatch;
 use App\Models\Slot;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 
@@ -28,11 +27,10 @@ use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-17 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->freeze = app(DispatchFreeze::class);
     $this->website = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api));
     $this->secret = app(ApiKeys::class)->issue($this->admin, $this->website)->secret;

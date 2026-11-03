@@ -25,16 +25,14 @@ use App\Models\StockUnit;
 use App\Models\Supplier;
 use App\Models\SupplierClaim;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Owner);
-    $this->stocker = staffMember(Role::NhapKho);
+    $this->admin = staffMember(Role::Admin);
+    $this->stocker = staffMember(Role::Importer);
     $this->report = app(SupplierLossReport::class);
 
     $this->netflix = productOf(

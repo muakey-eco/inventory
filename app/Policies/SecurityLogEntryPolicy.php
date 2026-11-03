@@ -16,12 +16,12 @@ class SecurityLogEntryPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function view(User $user, SecurityLogEntry $entry): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function create(User $user): bool

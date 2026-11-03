@@ -40,7 +40,6 @@ use App\Models\RevealLogEntry;
 use App\Models\StockLedgerEntry;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -48,12 +47,11 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function () {
     Storage::fake('intake');
     Storage::fake('local');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->reports = app(DefectReporting::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee', requiresExternalRef: true));
@@ -191,7 +189,7 @@ it('Báo lỗi không tạo được và không đổi gì', function (Closure $
 
         return [test()->seller, new DefectReportDraft('Lỗi'), "Lần giao {$first->unitLabel()}: Slot không còn Đã giao; không Báo lỗi được."];
     }, InvalidDefectReport::class],
-    'Nhập kho' => [fn () => [staffMember(Role::NhapKho), new DefectReportDraft('Lỗi'), ''], MissingRole::class],
+    'Nhập kho' => [fn () => [staffMember(Role::Importer), new DefectReportDraft('Lỗi'), ''], MissingRole::class],
 ]);
 
 it('trong lúc Chờ xác minh, Slot Còn hàng của cùng Đơn vị hàng không thuộc Tồn bán được và không được chọn khi xuất; Bác bỏ thì mở bán lại', function () {
@@ -282,7 +280,7 @@ it('xác minh không được và không đổi gì', function (Closure $arrange
 
         return [fn () => test()->reports->confirm(test()->seller, $report, DefectScope::Unit, 'Lỗi thật'), 'Đơn vị hàng đang Đã huỷ; chỉ Xác nhận được Phạm vi lỗi Chỉ Slot.'];
     }, InvalidDefectReport::class],
-    'Nhập kho' => [fn (DefectReport $report) => [fn () => test()->reports->reject(staffMember(Role::NhapKho), $report, 'Không lỗi'), ''], MissingRole::class],
+    'Nhập kho' => [fn (DefectReport $report) => [fn () => test()->reports->reject(staffMember(Role::Importer), $report, 'Không lỗi'), ''], MissingRole::class],
 ]);
 
 it('tạo lại Báo lỗi sau Bác bỏ được; hiện lịch sử các lần Bác bỏ của Slot', function () {
@@ -326,7 +324,7 @@ it('xác minh xem mã ghi Nhật ký xem mã ngữ cảnh Báo lỗi; chỉ khi 
 
     expect($reveal->canRevealDefectReport($this->seller, $report->fresh()))->toBeFalse()
         ->and(fn () => $reveal->revealDefectReport($this->seller, $report))->toThrow(InvalidReveal::class, 'Chỉ xem mã để xác minh Báo lỗi Chờ xác minh.')
-        ->and(fn () => $reveal->revealDefectReport(staffMember(Role::NhapKho), $report))->toThrow(MissingRole::class)
+        ->and(fn () => $reveal->revealDefectReport(staffMember(Role::Importer), $report))->toThrow(MissingRole::class)
         ->and(RevealLogEntry::count())->toBe(1);
 });
 

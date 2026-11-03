@@ -37,7 +37,7 @@ class SupplierClaims
      */
     public function create(User $actor, Supplier $supplier, array $units, ?string $note = null): SupplierClaim
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         return DB::transaction(function () use ($actor, $supplier, $units, $note): SupplierClaim {
             $locked = self::lockClaimable($supplier, $units);
@@ -66,7 +66,7 @@ class SupplierClaims
      */
     public function addUnits(User $actor, SupplierClaim $claim, array $units): void
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         DB::transaction(function () use ($claim, $units): void {
             // Báo sai trạng thái trước lỗi của từng Đơn vị hàng; kiểm lại dưới khoá sau khi khoá Đơn vị hàng.
@@ -88,7 +88,7 @@ class SupplierClaims
      */
     public function removeUnit(User $actor, SupplierClaimUnit $claimUnit): void
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         DB::transaction(function () use ($claimUnit): void {
             self::ensureDraft(self::lock($claimUnit->claim()->firstOrFail()));
@@ -108,7 +108,7 @@ class SupplierClaims
      */
     public function send(User $actor, SupplierClaim $claim): void
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         DB::transaction(function () use ($actor, $claim): void {
             $current = self::lock($claim);
@@ -135,7 +135,7 @@ class SupplierClaims
      */
     public function resolve(User $actor, SupplierClaim $claim, array $outcomes): void
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         DB::transaction(function () use ($actor, $claim, $outcomes): void {
             $current = self::lock($claim);
@@ -178,7 +178,7 @@ class SupplierClaims
      */
     public function cancel(User $actor, SupplierClaim $claim, string $reason): void
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
         $reason = trim($reason);
 
         if ($reason === '') {
@@ -253,7 +253,7 @@ class SupplierClaims
      */
     public function canEdit(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::NhapKho) && $claim->status === SupplierClaimStatus::Draft;
+        return $this->roles->allows($actor, Role::Importer) && $claim->status === SupplierClaimStatus::Draft;
     }
 
     /**
@@ -269,7 +269,7 @@ class SupplierClaims
      */
     public function canResolve(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::NhapKho) && $claim->status === SupplierClaimStatus::Sent;
+        return $this->roles->allows($actor, Role::Importer) && $claim->status === SupplierClaimStatus::Sent;
     }
 
     /**
@@ -277,7 +277,7 @@ class SupplierClaims
      */
     public function canCancel(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::NhapKho) && in_array($claim->status, SupplierClaimStatus::open(), true);
+        return $this->roles->allows($actor, Role::Importer) && in_array($claim->status, SupplierClaimStatus::open(), true);
     }
 
     /**
@@ -286,7 +286,7 @@ class SupplierClaims
      */
     public function canImportReplacementGoods(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::NhapKho)
+        return $this->roles->allows($actor, Role::Importer)
             && SupplierClaim::query()->acceptsReplacementGoods()->whereKey($claim->getKey())->exists();
     }
 

@@ -33,7 +33,6 @@ use App\Models\RevealLogEntry;
 use App\Models\SalesChannel;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
@@ -44,12 +43,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('intake');
     Repeater::fake();
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee', requiresExternalRef: true));
     $this->zalo = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Zalo'));
     $this->steam = productOf(
@@ -74,9 +72,9 @@ it('Quản trị và Bán hàng vào được Phiếu xuất, Nhập kho thì kh
     $this->get(DispatchResource::getUrl('create'))->assertStatus($dispatches);
     $this->get(SalesChannelResource::getUrl('index'))->assertStatus($channels);
 })->with([
-    'Quản trị' => [Role::Owner, 200, 200],
-    'Bán hàng' => [Role::BanHang, 200, 403],
-    'Nhập kho' => [Role::NhapKho, 403, 403],
+    'Quản trị' => [Role::Admin, 200, 200],
+    'Bán hàng' => [Role::Sale, 200, 403],
+    'Nhập kho' => [Role::Importer, 403, 403],
 ]);
 
 it('form xuất kho hiện Tồn lỗi riêng cạnh Tồn bán được', function () {
@@ -267,7 +265,7 @@ it('trang xem phiếu: Dòng xuất có Loại, Lần giao dạng che; Bán hàn
     Livewire::test(DispatchDeliveries::class, ['record' => $dispatch])
         ->assertActionVisible(TestAction::make('reveal')->table($delivery));
 
-    $this->actingAs(staffMember(Role::NhapKho));
+    $this->actingAs(staffMember(Role::Importer));
 
     $this->get(DispatchResource::getUrl('view', ['record' => $dispatch]))->assertForbidden();
 });
@@ -460,7 +458,7 @@ it('Giao thêm thiếu hàng thì modal báo thiếu và không thêm gì; phi�
 
     expect(DispatchLine::count())->toBe(1);
 
-    $this->actingAs(staffMember(Role::NhapKho));
+    $this->actingAs(staffMember(Role::Importer));
     $this->get($url)->assertForbidden();
 
     DB::table('dispatches')->where('id', $dispatch->id)->update(['status' => DispatchStatus::Cancelled->value]);

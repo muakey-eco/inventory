@@ -29,7 +29,6 @@ use App\Models\SecurityLogEntry;
 use App\Models\Slot;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -47,12 +46,11 @@ const HMAC_V2 = '2:base64:+aDuV69xpMmq8HrVKo6jtB43YKS+Sd8UDwlDy4k5kgk=';
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
 
     config(['inventory.keys.content' => CONTENT_V1, 'inventory.keys.content_previous' => []]);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->garena = productOf(
         StockForm::OneTimeCode,

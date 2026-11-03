@@ -38,7 +38,6 @@ use App\Models\Replacement;
 use App\Models\RevealLogEntry;
 use App\Models\Supplier;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -48,12 +47,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('intake');
     Storage::fake('local');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee', requiresExternalRef: true));
     $this->netflix = productOf(
         StockForm::Account,
@@ -237,7 +235,7 @@ it('danh sách Báo lỗi có tab Chờ xác minh quá 24 giờ; Bán hàng và 
     $this->get(DefectReportResource::getUrl('index'))->assertOk();
     $this->get(DefectReportResource::getUrl('view', ['record' => $overdue[0]]))->assertOk();
 
-    $this->actingAs(staffMember(Role::NhapKho));
+    $this->actingAs(staffMember(Role::Importer));
 
     $this->get(DefectReportResource::getUrl('index'))->assertForbidden();
 });
@@ -262,7 +260,7 @@ it('Đơn vị hàng Lỗi hiện Lần giao bị ảnh hưởng ở chi tiết 
     Livewire::test(ViewDefectReport::class, ['record' => $report->getRouteKey()])
         ->assertSeeHtml(StockUnitResource::getUrl('view', $unit));
 
-    $this->actingAs(staffMember(Role::NhapKho));
+    $this->actingAs(staffMember(Role::Importer));
 
     Livewire::test(ViewStockUnit::class, $unit)->assertDontSee(['Lần giao bị ảnh hưởng', 'Chị Lan']);
 });

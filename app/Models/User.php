@@ -2,33 +2,44 @@
 
 namespace App\Models;
 
-use App\Inventory\Staff\AuthentikRevocation;
+use App\Inventory\Access\Role;
+use App\Inventory\Staff\PlatformRevocation;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Support\Collection;
 
 /**
- * Nhân viên của shop. Danh tính, tên, email và Vai trò lấy từ Authentik (ADR 0008).
+ * Nhân viên của shop. Danh tính, tên, email và Vai trò lấy từ platform (ADR 0011).
  *
- * @property string $authentik_uuid
+ * @property string $platform_user_id
  * @property ?string $email
+ * @property Collection<int, Role> $roles Bản chụp Vai trò theo lần cuối kho thấy nhân viên này.
  * @property ?CarbonImmutable $deactivated_at
- * @property ?CarbonImmutable $authentik_revoked_at
- * @property ?AuthentikRevocation $authentik_revoked_reason
+ * @property ?CarbonImmutable $platform_revoked_at
+ * @property ?PlatformRevocation $platform_revoked_reason
+ * @property ?int $directory_seq `seq` của bản danh bạ mới nhất kho đã nhận về nhân viên này.
  */
-#[Fillable(['authentik_uuid', 'name', 'email'])]
-#[Hidden(['remember_token'])]
+#[Fillable(['platform_user_id', 'name', 'email'])]
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, Notifiable;
+
+    /**
+     * Nhân viên mới chưa có bản chụp Vai trò nào, như default của cột.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'roles' => '[]',
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -38,10 +49,10 @@ class User extends Authenticatable implements FilamentUser
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
+            'roles' => AsEnumCollection::of(Role::class),
             'deactivated_at' => 'immutable_datetime',
-            'authentik_revoked_at' => 'immutable_datetime',
-            'authentik_revoked_reason' => AuthentikRevocation::class,
+            'platform_revoked_at' => 'immutable_datetime',
+            'platform_revoked_reason' => PlatformRevocation::class,
         ];
     }
 
@@ -54,21 +65,21 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Nhân viên mất quyền vì Authentik đã tắt họ, xoá họ hoặc gỡ họ khỏi mọi group `kho-*`. Tự hết
-     * khi Authentik cấp lại quyền, khác Khoá nhân viên.
+     * Nhân viên mất quyền vì platform đã đình chỉ hoặc xoá họ, theo Bản sao danh bạ. Tự hết khi
+     * platform cấp lại quyền, khác Khoá nhân viên.
      */
-    public function isRevokedByAuthentik(): bool
+    public function isRevokedByPlatform(): bool
     {
-        return $this->authentik_revoked_at !== null;
+        return $this->platform_revoked_at !== null;
     }
 
     /**
-     * Không vào được kho, vì Khoá nhân viên hoặc vì mất quyền theo Authentik. Middleware
-     * Authenticate của panel hỏi lại ở mỗi request, nên phiên đang mở bị cắt ở request kế tiếp.
+     * Không vào được kho, vì Khoá nhân viên hoặc vì mất quyền theo platform. Panel hỏi lại ở mỗi
+     * request qua {@see canAccessPanel()}, nên phiên đang mở bị chặn ở request kế tiếp.
      */
     public function isLockedOut(): bool
     {
-        return $this->isDeactivated() || $this->isRevokedByAuthentik();
+        return $this->isDeactivated() || $this->isRevokedByPlatform();
     }
 
     public function canAccessPanel(Panel $panel): bool

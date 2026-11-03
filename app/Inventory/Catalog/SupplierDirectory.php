@@ -24,7 +24,7 @@ class SupplierDirectory
      */
     public function create(User $actor, string $name, ?string $note = null): Supplier
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         return self::save(new Supplier, $name, $note);
     }
@@ -35,7 +35,7 @@ class SupplierDirectory
      */
     public function update(User $actor, Supplier $supplier, string $name, ?string $note): Supplier
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         return self::save($supplier, $name, $note);
     }
@@ -45,7 +45,7 @@ class SupplierDirectory
      */
     public function delete(User $actor, Supplier $supplier): void
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         if (Batch::query()->where('supplier_id', $supplier->getKey())->exists()) {
             throw new InvalidSupplier("Nhà cung cấp \"{$supplier->name}\" đã có Lô nhập, không xoá được.");

@@ -59,7 +59,7 @@ class SlotsRelationManager extends RelationManager
                 TextColumn::make('cost')
                     ->label('Giá vốn')
                     ->formatStateUsing(fn (int $state): string => number_format($state, 0, ',', '.').' ₫')
-                    ->visible(fn (): bool => app(RoleGate::class)->allows(InventoryAction::actor(), Role::NhapKho)),
+                    ->visible(fn (): bool => app(RoleGate::class)->allows(InventoryAction::actor(), Role::Importer)),
             ])
             ->recordActions([
                 Action::make('reveal')

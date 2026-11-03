@@ -37,7 +37,7 @@ class ProductCatalog
      */
     public function create(User $actor, ProductDraft $draft): Product
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
         self::validate($draft);
 
         return self::guardCode($draft, fn (): Product => DB::transaction(
@@ -52,7 +52,7 @@ class ProductCatalog
      */
     public function update(User $actor, Product $product, ProductDraft $draft): Product
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
 
         return self::guardCode($draft, fn (): Product => DB::transaction(function () use ($product, $draft): Product {
             $current = Product::query()->lockForUpdate()->findOrFail($product->getKey());
@@ -82,7 +82,7 @@ class ProductCatalog
      */
     public function discontinue(User $actor, Product $product): void
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
 
         $product->forceFill(['discontinued_at' => $product->discontinued_at ?? now()])->save();
     }
@@ -95,7 +95,7 @@ class ProductCatalog
      */
     public function delete(User $actor, Product $product): void
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
 
         DB::transaction(function () use ($product): void {
             $current = Product::query()->lockForUpdate()->findOrFail($product->getKey());

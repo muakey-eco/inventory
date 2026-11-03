@@ -19,48 +19,27 @@ docker compose run --rm app php artisan inventory:keys:register
 docker compose up -d
 ```
 
-Panel ở <http://localhost:8080/admin>. Nhân viên đăng nhập qua Authentik (xem [Đăng nhập qua Authentik](#đăng-nhập-qua-authentik)). Máy dev chưa có Authentik thì vào <http://localhost:8080/admin/auth/dev>: `migrate --seed` ở `APP_ENV=local` tạo sẵn một nhân viên cho mỗi Vai trò, chọn một người là vào thẳng. Route này chỉ tồn tại khi `APP_ENV=local`.
+Panel ở <http://localhost:8080/admin>. Nhân viên đăng nhập qua platform Muakey (xem [Đăng nhập qua platform](#đăng-nhập-qua-platform)); máy dev cũng vậy, không còn đăng nhập giả.
 
-### Authentik trên máy dev
+### Đăng nhập trên máy dev
 
-Route đăng nhập giả đủ cho việc hằng ngày. Muốn thử luồng thật (redirect, callback, `kho_groups`, `amr`, trang từ chối, đối soát, back-channel logout) trước khi deploy thì bật profile `sso`: Authentik 2026.8 (server, worker, Postgres riêng) dựng sẵn mọi thứ theo blueprint [`docker/authentik/blueprints/kho.yaml`](docker/authentik/blueprints/kho.yaml). Profile này không chạy mặc định vì Authentik ngốn tài nguyên, và không dùng cho production ([ADR 0008](docs/adr/0008-authentik-lam-chu-xac-thuc-va-vai-tro.md)).
+Máy dev đăng nhập bằng **App thử** `inventory-dev` đăng ký trên chính platform production, bằng tài khoản thật của mình (ADR-0018 của platform). Cần bật VPN: `/v1` của platform chỉ vào được qua VPN.
 
-1. Trình duyệt và container kho phải gọi Authentik bằng cùng một địa chỉ, vì issuer trong token lấy theo địa chỉ đó. Thêm một dòng vào `/etc/hosts` của máy chạy trình duyệt (một lần):
-
-   ```bash
-   echo "127.0.0.1 authentik.test" | sudo tee -a /etc/hosts
-   ```
-
-   Không dùng được `*.localhost`: curl trong container ép mọi tên `*.localhost` về loopback của chính container. Trình duyệt ở máy khác (ví dụ qua Tailscale) thì trỏ `authentik.test` về IP máy dev, và mở thêm cổng 9030 trên IP đó trong `compose.override.yaml` như cổng 8080.
-
-2. Bật Authentik. Lần đầu mất chừng một phút để migrate và áp blueprint:
+1. Lấy secret của OIDC client `inventory-dev` trong trình quản lý mật khẩu của team, đặt vào `PLATFORM_CLIENT_SECRET` trong `.env`. Các biến `PLATFORM_*` còn lại đã có sẵn trong `.env.example`. `PLATFORM_REDIRECT_URI` phải khớp nguyên văn redirect URI đã đăng ký cho App thử (`http://localhost:8080/admin/auth/callback`); mở kho ở địa chỉ khác (ví dụ qua Tailscale) thì nhờ admin thêm redirect URI đó.
+2. Tự gán role trong App thử cho mình ở Admin console (mục Apps, tab Thành viên của `inventory-dev`): dev của kho là thành viên Nhóm sở hữu nên không cần nhờ admin. Đổi role có hiệu lực ở request kế tiếp.
+3. Manifest đổi thì sync cho App thử bằng Client CI `inventory-dev-ci`; `platform.override.yaml` phủ `home_url` và gỡ `webhook` (App thử không nhận webhook):
 
    ```bash
-   docker compose --profile sso up -d
+   PLATFORM_URL=https://platform.muakeyoffice.net \
+   PLATFORM_ISSUER=https://id.muakeyoffice.net/oidc \
+   PLATFORM_CLIENT_ID=inventory-dev-ci \
+   PLATFORM_CLIENT_SECRET=<secret của inventory-dev-ci> \
+   npx @muakey-eco/platform-cli sync --dry-run
    ```
 
-   Giao diện quản trị ở <http://authentik.test:9030/if/admin/>, đăng nhập `akadmin` / `kho-dev-akadmin`.
+   Xem kết quả rồi chạy lại không có `--dry-run` để áp.
 
-3. Chuyển kho sang Authentik: bỏ comment bốn giá trị `AUTHENTIK_*` cho chế độ `sso` trong `.env.example` rồi chép sang `.env`. Không cần khởi động lại gì: app và scheduler đọc `.env` ở mỗi request và mỗi lần chạy lệnh. Từ đây `/admin/login` chuyển sang Authentik.
-
-User mẫu, mật khẩu chung `kho-dev-mat-khau`:
-
-| User | Group | Kết quả |
-|---|---|---|
-| `quan-tri` | `kho-quan-tri` | vào kho với Vai trò Quản trị |
-| `nhap-kho` | `kho-nhap-kho` | vào kho với Vai trò Nhập kho |
-| `ban-hang` | `kho-ban-hang` | vào kho với Vai trò Bán hàng |
-| `khach` | không có | Authentik từ chối ngay, không về tới kho |
-
-Flow đăng nhập bắt MFA: lần đầu mỗi user phải cài TOTP (quét QR bằng app authenticator) hoặc mã tĩnh. Lần đăng nhập ngay sau khi cài, Authentik chưa gắn `mfa` vào `amr` nên kho ghi Nhật ký bảo mật "Đăng nhập thiếu bằng chứng MFA"; từ lần sau thì không. Trang từ chối của chính kho thì thử bằng cách đặt **Khoá nhân viên** cho một user mẫu rồi đăng nhập lại. Back-channel logout thì thử bằng cách xoá phiên của user trong Authentik (Directory → Users → Sessions): Authentik gọi `http://app:8000/auth/authentik/backchannel-logout` qua mạng compose. Service account `kho-sync` (chỉ đọc) và token của nó cũng có sẵn, scheduler đối soát mỗi phút như production.
-
-Quay lại route đăng nhập giả: để trống lại bốn giá trị `AUTHENTIK_*`, rồi `docker compose --profile sso stop`. Lúc bật `sso`, đối soát đã thu quyền ba nhân viên giả của seeder (uuid của họ không có trên Authentik), nên chạy lại seeder để trả quyền:
-
-```bash
-docker compose exec app php artisan db:seed --class=DevStaffSeeder
-```
-
-Muốn Authentik về trạng thái trắng (xoá cả thiết bị MFA đã cài) thì `docker compose --profile sso down` rồi `docker volume rm inventory_authentik-postgres-data`. User mẫu khi đó mang uuid mới: kho coi họ là nhân viên mới ở lần đăng nhập kế, còn bản cũ bị đối soát đánh dấu không còn trên Authentik. Blueprint là trạng thái mong muốn: sửa file là worker tự áp lại, kể cả đặt lại mật khẩu user mẫu.
+App thử không thử được webhook danh bạ, back-channel logout, người bị đình chỉ hay nhiều nhân viên với Vai trò khác nhau: những phần đó có feature test trên `Platform::fake()` (`tests/Feature/Auth`, `tests/Feature/Staff/StaffDirectoryTest.php`).
 
 Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev server ở cổng 5173, không cần cài Node trên máy. Mở app ở địa chỉ khác `localhost` (ví dụ qua Tailscale) thì đặt `VITE_ORIGIN` và `VITE_HMR_HOST` cho khớp.
 
@@ -68,56 +47,18 @@ Asset do service `node` build: `docker compose up -d` chạy luôn Vite dev serv
 
 Production chạy trên cụm k3s dùng chung của tổ chức ([ADR 0009](docs/adr/0009-kho-chay-tren-k3s-nhieu-replica.md)), xem [Chạy trên k3s](#chạy-trên-k3s). Repo không còn stack Compose cho production: `compose.yaml` chỉ dành cho dev. Image build thủ công trên máy dev bằng `scripts/build-image.sh` rồi đẩy lên Registry nội bộ (Bizfly Container Registry của Muakey).
 
-### Đăng nhập qua Authentik
+### Đăng nhập qua platform
 
-Authentik là đường đăng nhập duy nhất và làm chủ cả **Vai trò** ([ADR 0008](docs/adr/0008-authentik-lam-chu-xac-thuc-va-vai-tro.md)): kho không có mật khẩu, không có 2FA riêng, không có đường phá kính. Mỗi lần đăng nhập, và mỗi phút qua đối soát (xem [Đối soát nhân viên](#đối-soát-nhân-viên-với-authentik)), kho đồng bộ tên, email và Vai trò của nhân viên theo Authentik. Cấu hình một lần trên Authentik:
+Platform Muakey (`https://id.muakeyoffice.net/oidc`) là đường đăng nhập duy nhất và làm chủ cả **Vai trò** ([ADR 0011](docs/adr/0011-platform-lam-chu-xac-thuc-va-vai-tro.md)), qua SDK `muakey/platform-laravel`: kho không có mật khẩu, không có 2FA riêng, không có đường phá kính. Route của SDK nằm dưới `/admin/auth` (login, callback, logout, back-channel logout, webhook); đăng nhập không thành thì SDK đưa về `/admin/dang-nhap-loi`, một trang tĩnh có nút Thử lại.
 
-1. **Ba group**, mỗi group một Vai trò: `kho-quan-tri` (Quản trị), `kho-nhap-kho` (Nhập kho), `kho-ban-hang` (Bán hàng). Người không ở group `kho-*` nào bị kho từ chối.
-2. **Scope mapping** (Customization → Property Mappings → Scope Mapping), scope name `kho`, expression:
+- **Vai trò là Permission.** Mỗi Vai trò ứng với đúng một Permission trong [`platform.yaml`](platform.yaml): `admin` (Quản trị), `importer` (Nhập kho), `sale` (Bán hàng), cộng Permission vào cửa `access`. Role cùng tên trên platform cấp Permission đó kèm `access`. Thu quyền trên platform có hiệu lực ở request kế tiếp nhờ Phiên bản quyền, không có đối soát định kỳ.
+- **Bản chụp Vai trò.** Mỗi request vào panel so Permission platform trả với Vai trò lần cuối kho thấy; khác thì cập nhật và ghi Nhật ký bảo mật "Vai trò đổi theo platform". Trang Nhân viên hiện Vai trò theo bản chụp đó.
+- **Bản sao danh bạ.** Webhook `user.*` (`PLATFORM_WEBHOOK_SECRET`) và lệnh `platform:directory-sync` (scheduler mỗi giờ, Job `migrate` mỗi deploy) cập nhật tên, email và **Mất quyền theo platform** của nhân viên kho đã biết, khi họ bị đình chỉ hay bị xoá. Danh bạ không mang Permission: người chỉ mất `access` bị guard chặn mà trang Nhân viên không thấy.
+- **Idle timeout.** Kho tự kết thúc Phiên App sau 2 giờ không thao tác, dù Phiên App của SDK sống 7 ngày. `wire:poll` không gia hạn.
+- **Khoá nhân viên** vẫn là của kho: chặn ở request kế tiếp, độc lập với platform.
+- Đăng xuất ở kho kết thúc cả Phiên SSO trên platform. Platform kết thúc Phiên SSO (đăng xuất ở App khác, đình chỉ, thu hồi) thì gọi back-channel logout và phiên kho mất ngay.
 
-   ```python
-   return {"kho_groups": [group.name for group in request.user.groups.filter(name__startswith="kho-")]}
-   ```
-
-   Đừng dùng `request.user.ak_groups` trong tài liệu cũ: từ Authentik 2026.8 nó là proxy deprecated, mỗi lần gọi ghi một event cảnh báo, và sẽ bị bỏ.
-
-   Claim phải tên `kho_groups`, không phải `groups`: scope `profile` mặc định đã trả `groups` gồm mọi group, và Authentik nối list khi trộn claim cùng tên nên bộ lọc mất tác dụng.
-3. **Provider** OAuth2/OpenID:
-   - Client type **Confidential**. Redirect URI (strict): `https://<APP_URL>/admin/auth/callback`.
-   - **Signing key**: chọn một certificate. Kho chỉ nhận id_token ký RS256 qua JWKS; để trống thì Authentik ký HS256 và mọi lần đăng nhập bị từ chối.
-   - **Subject mode**: *Based on the User's UUID* (`user_uuid`). Kho khớp nhân viên theo `sub`, nên đổi subject mode sau này là mọi người thành nhân viên mới.
-   - Scopes: `openid`, `profile`, `email` mặc định cộng scope mapping `kho` ở bước 2. Bật **Include claims in id_token**: kho đọc tên, email và `kho_groups` từ id_token, không gọi userinfo.
-4. **Application** gắn provider trên, kèm policy/binding chỉ cho thành viên ba group `kho-*` vào.
-5. **Flow** xác thực của Application phải bắt MFA (stage Authenticator Validation, không để "skip" khi người dùng chưa có thiết bị). Kho không chặn theo `amr`, chỉ ghi Nhật ký bảo mật "Đăng nhập thiếu bằng chứng MFA" khi `amr` thiếu `mfa` (Authentik bỏ `mfa` cả khi stage MFA được bỏ qua nhờ cookie).
-
-Rồi đặt `AUTHENTIK_ISSUER` (`https://auth.example.com/application/o/<slug-của-application>/`, có dấu `/` cuối) và `AUTHENTIK_CLIENT_ID` trong `deploy/k3s/config.env`, còn `AUTHENTIK_CLIENT_SECRET` trên Infisical (xem [Dựng lần đầu trên k3s](#dựng-lần-đầu-trên-k3s)).
-
-Đăng xuất ở kho chỉ huỷ phiên kho, không đụng phiên Authentik. Mọi lần từ chối (không có Vai trò, bị Khoá nhân viên, state/nonce sai, Authentik báo lỗi) dừng ở một trang tĩnh có nút Thử lại, không tự chuyển hướng.
-
-### Đối soát nhân viên với Authentik
-
-Service `scheduler` chạy `inventory:staff:sync` **mỗi phút**: kho đọc `GET /api/v3/core/users/?uuid=…` (cùng gốc với `AUTHENTIK_ISSUER`; mỗi nhân viên một lần gọi vì bộ lọc `uuid` chỉ nhận một giá trị) cho các nhân viên đã có trong kho, không tạo sẵn người chưa từng đăng nhập. Ai bị tắt (`is_active=false`), bị xoá, hoặc không còn group `kho-*` nào thì **mất quyền theo Authentik**: phiên đang mở bị đăng xuất ở request kế tiếp. Authentik cấp lại thì tự có lại quyền, trừ khi đang bị **Khoá nhân viên** — đối soát không bao giờ mở khoá đó. Tên, email, Vai trò cũng đồng bộ theo; Vai trò đổi hay mất/có lại quyền đều ghi Nhật ký bảo mật (`via: authentik_sync`). Trang Nhân viên hiện hai cột riêng: Khoá nhân viên và Authentik.
-
-Authentik lỗi (mạng, 5xx, token sai/thiếu quyền, trả sai dạng) thì kho **giữ nguyên quyền hiện có** và ghi log. Không chạy được liên tục từ 5 phút (Authentik lỗi, scheduler chết, hay lệnh vỡ vì lỗi khác) thì trang Tổng quan hiện cảnh báo cho Quản trị, tự biến mất khi đối soát chạy lại được; trong lúc đó cần chặn ai ngay thì dùng Khoá nhân viên.
-
-Cấu hình một lần trên Authentik:
-
-1. **Service account** (Directory → Users → Create Service Account), ví dụ `kho-sync`. Bỏ chọn tạo token có hạn.
-2. **Role** (Directory → Roles) có hai quyền `authentik_core.view_user` (Can view User) và `authentik_core.view_group` (Can view Group), gán cho service account (trực tiếp, hoặc qua một group chỉ chứa nó). Không cấp quyền ghi nào.
-3. **Token** (Directory → Tokens and App passwords → Create) cho service account: Intent **API Token**, **bỏ Expiring**. Token có hạn bị Authentik tự xoay giá trị khi hết hạn, kho sẽ mất kết nối mà không ai đổi secret.
-
-Rồi đặt token vào `AUTHENTIK_API_TOKEN` trên Infisical.
-
-### Back-channel logout từ Authentik
-
-Đối soát để lại độ trễ tới một phút. Authentik (từ 2025.8, tính năng còn gắn nhãn **Preview**) gửi thêm một `logout_token` có chữ ký sang kho khi phiên Authentik kết thúc: nhân viên đăng xuất, Quản trị Authentik xoá phiên, người dùng bị tắt, hay phiên hết hạn. Kho xác minh chữ ký qua JWKS cùng `iss`, `aud`, `iat`, `events`, chống phát lại theo `jti`, rồi huỷ phiên kho ở request kế tiếp: đúng phiên mở từ phiên Authentik đó nếu token có `sid`, mọi phiên của nhân viên nếu chỉ có `sub`. Endpoint chỉ huỷ phiên, không bao giờ cấp hay đổi quyền; quyền vẫn đổi qua đăng nhập và đối soát, nên Authentik không gửi được thì đối soát vẫn là lưới an toàn. Mỗi logout_token hợp lệ có `sub` của một nhân viên kho ghi Nhật ký bảo mật "Authentik huỷ phiên kho" (`scope`: `session` hoặc `all_sessions`), kể cả khi phiên kho đó đã tự hết; token bị từ chối chỉ ghi log ứng dụng.
-
-Cấu hình trên **Provider** ở mục Đăng nhập (Advanced protocol settings):
-
-- **Logout URI**: `https://<APP_URL>/auth/authentik/backchannel-logout` (không có `/admin`). Authentik gọi từ server của nó, nên URL này phải tới được từ máy chạy Authentik.
-- **Logout Method**: **Back-channel**.
-
-Không cần thêm biến môi trường: kho dùng lại `AUTHENTIK_ISSUER` và `AUTHENTIK_CLIENT_ID`.
+Đăng nhập bị từ chối và bằng chứng MFA không tới kho: platform từ chối trước, nên chúng nằm ở nhật ký của platform. Platform sập thì không ai đăng nhập được; Người vận hành server vẫn bật được **Tạm dừng xuất kho** qua dòng lệnh.
 
 ### Chạy trên k3s
 
@@ -137,7 +78,7 @@ Argo CD tự sync: Job `migrate` chạy, `web` rolling hai replica nên không g
 
 Đổi secret trên Infisical không làm pod đổi theo. Đợi Secret cập nhật (tối đa một giờ, hoặc `kubectl -n inventory annotate externalsecret inventory-secret force-sync=$(date +%s) --overwrite`), rồi `kubectl -n inventory rollout restart deployment/web deployment/queue deployment/scheduler`.
 
-- **Job `migrate`.** Là hook `Sync` của Argo CD (`BeforeHookCreation`): mỗi lần sync, Argo xoá Job cũ rồi dựng Job mới. Job chạy `migrate --force` rồi `db:seed --class=RoleSeeder --force`. Seeder chạy lại nhiều lần vẫn an toàn. Chỉ Job này migrate, nên không cần khoá giữa các pod.
+- **Job `migrate`.** Là hook `Sync` của Argo CD (`BeforeHookCreation`): mỗi lần sync, Argo xoá Job cũ rồi dựng Job mới. Job chạy `migrate --force` rồi `platform:directory-sync` để bù những gì đổi trên platform trong lúc kho dừng; lượt quét hỏng không chặn deploy. Chỉ Job này migrate, nên không cần khoá giữa các pod.
 - **initContainer `wait-for-migrate`.** Cả ba Deployment `web`, `queue`, `scheduler` có cùng một initContainer, cùng image, `args: ["inventory-init"]`. Đặt `args`, không đặt `command`, để ENTRYPOINT vẫn chạy trước. Script chờ tới khi không còn migration pending (tối đa `INVENTORY_MIGRATE_WAIT_SECONDS`, mặc định 600, rồi pod khởi động lại), sau đó chạy `inventory:keys:verify`. Khoá không khớp thì pod không bao giờ lên.
 - **Container chính.** `web` giữ CMD mặc định (FrankenPHP cổng 8000). `queue` chạy `php artisan queue:work --tries=1`, `scheduler` chạy `php artisan schedule:work`.
 - **Probe.** `HEALTHCHECK` của image nền gọi admin Caddy cổng 2019. Kubelet bỏ qua `HEALTHCHECK`, nhưng đừng chép nó sang probe: `queue` và `scheduler` không chạy Caddy. Chỉ `web` có readiness/liveness probe, là `httpGet` `/up` cổng 8000. `queue` và `scheduler` không có probe HTTP.
@@ -168,13 +109,16 @@ Việc tay, làm một lần, cần người có quyền trên từng hệ thố
    }'
    ```
 
-3. **Authentik** `https://auth.muakeyoffice.net`: làm đủ các bước ở [Đăng nhập qua Authentik](#đăng-nhập-qua-authentik), [Đối soát nhân viên](#đối-soát-nhân-viên-với-authentik) (service account `kho-sync`) và [Back-channel logout](#back-channel-logout-từ-authentik), với slug Application là `inventory` và:
-   - Redirect URI (strict): `https://kho.muakeyoffice.net/admin/auth/callback`.
-   - Logout URI: `http://web.inventory.svc:8000/auth/authentik/backchannel-logout`. Authentik chạy trong cùng cụm nên gọi thẳng Service `web`, không qua ingress (ingress chỉ mở cho mạng nội bộ).
+3. **Platform** (Admin console): đăng ký App `inventory` với
+   - Redirect URI: `https://kho.muakeyoffice.net/admin/auth/callback`; post-logout redirect URI: `https://kho.muakeyoffice.net/`.
+   - `backchannel_logout_uri`: `http://web.inventory.svc:8000/admin/auth/backchannel-logout`. Platform chạy trong cùng cụm nên gọi thẳng Service `web`, không qua ingress.
+   - Scope `directory.read` ở tab "Client & secret", cho Bản sao danh bạ.
 
-   Client ID là cấu hình, không phải bí mật: ghi vào `AUTHENTIK_CLIENT_ID` trong `deploy/k3s/config.env`. Tới lúc đó pod vẫn chạy, chỉ đăng nhập là hỏng.
+   Rồi áp [`platform.yaml`](platform.yaml) bằng `npx @muakey-eco/platform-cli sync` với Client CI `inventory-ci` (như ở [Đăng nhập trên máy dev](#đăng-nhập-trên-máy-dev), không có file phủ), và lấy secret webhook bằng `POST /v1/apps/inventory/webhook/secret/rotate` với cùng Client CI. Namespace `inventory` mang nhãn `muakey.io/app=true` (`deploy/k3s/namespace.yaml`) để NetworkPolicy của platform cho kho gọi `/v1` và Redis; NetworkPolicy phía platform thì chỉnh ở k3s-ops. Client ID là cấu hình (`PLATFORM_CLIENT_ID` trong `deploy/k3s/config.env`).
 
-4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ chín khoá mà `deploy/k3s/externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
+   Gán permission `admin` (role `admin`) cho chủ shop trên platform **trước** lần đăng nhập đầu tiên: kho không có Quản trị nào khác.
+
+4. **Infisical** (project `muakey-ekl5`, môi trường `prod`, thư mục `/inventory`): tạo đủ mười khoá mà `deploy/k3s/externalsecret.yaml` liệt kê. Thiếu một khoá thì Secret không được tạo và không pod nào chạy. Khoá được phép rỗng vẫn phải tồn tại.
 
    | Khoá | Giá trị |
    |---|---|
@@ -182,14 +126,16 @@ Việc tay, làm một lần, cần người có quyền trên từng hệ thố
    | `INVENTORY_CONTENT_KEY`, `INVENTORY_HMAC_KEY` | mỗi khoá một lần `echo "1:base64:$(openssl rand -base64 32)"` |
    | `INVENTORY_CONTENT_PREVIOUS_KEYS` | rỗng |
    | `DB_PASSWORD` | mật khẩu ở bước 1 |
-   | `AUTHENTIK_CLIENT_SECRET`, `AUTHENTIK_API_TOKEN` | từ bước 3 |
+   | `PLATFORM_CLIENT_SECRET` | secret của OIDC client `inventory`, platform chỉ hiện một lần lúc đăng ký |
+   | `PLATFORM_REDIS_PASSWORD` | mật khẩu user Redis `apps` của platform (chỉ `GET pv:*`), an toàn trong URL |
+   | `PLATFORM_WEBHOOK_SECRET` | `whsec_…` từ bước 3 |
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | access key của versitygw, quyền đọc ghi bucket `muakey-inventory` |
 
    Hai khoá `INVENTORY_*_KEY` cần một bản sao ngoài Infisical, tách khỏi backup Postgres và bucket (ADR 0001, 0010): mất khoá nội dung là mất toàn bộ hàng.
 
 5. **Image và manifest**: deploy như ở trên. Lần đầu, k3s-ops còn phải có dòng `- inventory/application.yaml` trong `applications/kustomization.yaml`.
 
-Lần sync đầu, Job `migrate` dựng schema và seed Vai trò. Pod `web`, `queue`, `scheduler` thì kẹt ở initContainer `wait-for-migrate`, vì `inventory:keys:verify` thất bại khi chưa có dấu vân tay khoá nào. Đó là dự kiến. Đăng ký khoá một lần bằng một pod tạm, cùng image và cùng env với Deployment:
+Lần sync đầu, Job `migrate` dựng schema. Pod `web`, `queue`, `scheduler` thì kẹt ở initContainer `wait-for-migrate`, vì `inventory:keys:verify` thất bại khi chưa có dấu vân tay khoá nào. Đó là dự kiến. Đăng ký khoá một lần bằng một pod tạm, cùng image và cùng env với Deployment:
 
 ```bash
 image=$(kubectl -n inventory get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}')
@@ -209,12 +155,13 @@ kubectl -n inventory run keys-register --rm -i --restart=Never --image="$image" 
 
 Pod đang kẹt tự lên ở lần thử lại kế tiếp của initContainer. Muốn nhanh hơn thì `kubectl -n inventory rollout restart deployment/web deployment/queue deployment/scheduler`.
 
-Quản trị đầu tiên sinh ra ở lần đầu một thành viên group `kho-quan-tri` đăng nhập. Nghiệm thu bằng tay:
-- Đăng nhập qua Authentik. Trang panel tải được `livewire.min.js`, vì route cache nướng trong image mà prefix route của Livewire tính từ `APP_KEY` lúc chạy.
+Quản trị đầu tiên sinh ra ở lần đầu chủ shop (đã có permission `admin`) đăng nhập. Nghiệm thu bằng tay:
+- Đăng nhập qua platform. Trang panel tải được `livewire.min.js`, vì route cache nướng trong image mà prefix route của Livewire tính từ `APP_KEY` lúc chạy.
 - Nhập một Lô nhập. Bước này kiểm CORS của bucket.
 - Xuất kho.
 - Gửi một Báo lỗi có ảnh.
-- Tắt phiên của mình trên Authentik để thấy back-channel logout huỷ phiên kho.
+- Đăng xuất ở một App khác của platform để thấy back-channel logout huỷ phiên kho.
+- Chạy `kubectl -n inventory exec deploy/web -- php artisan platform:directory-sync` để thấy Bản sao danh bạ chạy được (cần scope `directory.read`).
 - Deploy một tag mới trong lúc gọi `/up` liên tục để thấy `web` không gián đoạn.
 
 ### File trên S3-compatible (k3s)
@@ -375,10 +322,10 @@ Từng có khoá backup (`INVENTORY_BACKUP_KEY`) nhưng nó chưa mã hoá gì n
 Khi Quản trị bị Khoá nhân viên mà không còn Quản trị nào khác mở được, người vận hành server chạy:
 
 ```bash
-kubectl -n inventory exec deploy/web -- php artisan staff:recover-owner chu@shop.test --unlock
+kubectl -n inventory exec deploy/web -- php artisan staff:recover-admin chu@shop.test --unlock
 ```
 
-Chỉ áp dụng cho nhân viên mang Vai trò Quản trị; mỗi lần ghi Nhật ký bảo mật. Mất thiết bị MFA hay quên mật khẩu thì xử lý trên Authentik, không phải ở kho.
+Chỉ áp dụng cho nhân viên mà bản chụp Vai trò có Quản trị; mỗi lần ghi Nhật ký bảo mật. Mất thiết bị MFA, quên mật khẩu hay mất permission `admin` thì xử lý trên platform, không phải ở kho.
 
 ## Kiểm tra
 
@@ -392,4 +339,4 @@ docker compose run --rm app vendor/bin/pint
 
 - `app/Inventory`: module nghiệp vụ Kho (Vai trò, Nhật ký bảo mật, Danh mục Sản phẩm và Nhà cung cấp, Nhập hàng, Sổ biến động kho...). Filament và API chỉ là adapter mỏng gọi vào đây.
 - `app/Filament`: panel quản trị.
-- `database/seeders/RoleSeeder.php`: ba Vai trò Quản trị, Nhập kho, Bán hàng.
+- `platform.yaml`: Manifest platform, ba Vai trò Quản trị, Nhập kho, Bán hàng là ba Permission `admin`, `importer`, `sale`.

@@ -28,6 +28,13 @@ spec:
                 name: inventory-secret
             - configMapRef:
                 name: inventory-config
+          env:
+            # Redis của platform, user `apps` chỉ được `GET pv:*`: SDK đọc Phiên
+            # bản quyền ở mỗi request (ADR 0011). Ghép ở đây để mật khẩu nằm
+            # trong Secret, phần còn lại trong git. `$(...)` đọc được khoá của
+            # `envFrom` ở trên; mật khẩu phải an toàn trong URL.
+            - name: PLATFORM_REDIS_URL
+              value: redis://apps:$(PLATFORM_REDIS_PASSWORD)@redis.platform.svc:6379
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

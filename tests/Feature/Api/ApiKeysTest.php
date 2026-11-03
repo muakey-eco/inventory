@@ -11,14 +11,12 @@ use App\Inventory\Security\SecurityEvent;
 use App\Models\ApiKey;
 use App\Models\SecurityLogEntry;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
-    $this->seed(RoleSeeder::class);
     $this->keys = app(ApiKeys::class);
     $this->channels = app(SalesChannelDirectory::class);
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->website = $this->channels->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api, requiresExternalRef: true));
 });
 
@@ -45,8 +43,8 @@ it('chỉ Quản trị tạo, thu hồi và xoay Khoá API', function (Role $rol
         ->and(ApiKey::count())->toBe(1)
         ->and($issued->key->fresh()->isRevoked())->toBeFalse();
 })->with([
-    'Nhập kho' => [Role::NhapKho],
-    'Bán hàng' => [Role::BanHang],
+    'Nhập kho' => [Role::Importer],
+    'Bán hàng' => [Role::Sale],
 ]);
 
 it('chỉ Kênh bán loại API mới có Khoá API', function () {

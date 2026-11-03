@@ -17,17 +17,17 @@ class ApiKeyPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function view(User $user, ApiKey $key): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function update(User $user, ApiKey $key): bool

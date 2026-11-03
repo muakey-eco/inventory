@@ -6,7 +6,7 @@ use App\Filament\Resources\Staff\StaffResource;
 use Filament\Resources\Pages\ManageRecords;
 
 /**
- * Không có nút tạo nhân viên: nhân viên sinh ra ở lần đầu đăng nhập qua Authentik.
+ * Không có nút tạo nhân viên: nhân viên sinh ra ở lần đầu đăng nhập qua platform.
  */
 class ManageStaff extends ManageRecords
 {

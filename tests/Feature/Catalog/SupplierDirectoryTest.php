@@ -5,10 +5,8 @@ use App\Inventory\Access\Role;
 use App\Inventory\Catalog\InvalidSupplier;
 use App\Inventory\Catalog\SupplierDirectory;
 use App\Models\Supplier;
-use Database\Seeders\RoleSeeder;
 
 beforeEach(function () {
-    $this->seed(RoleSeeder::class);
     $this->suppliers = app(SupplierDirectory::class);
 });
 
@@ -19,12 +17,12 @@ it('Quản trị và Nhập kho tạo được Nhà cung cấp', function (Role 
         ->name->toBe('Kinguin')
         ->note->toBe('Liên hệ qua Telegram @kinguin');
 })->with([
-    'Quản trị' => Role::Owner,
-    'Nhập kho' => Role::NhapKho,
+    'Quản trị' => Role::Admin,
+    'Nhập kho' => Role::Importer,
 ]);
 
 it('Bán hàng không tạo được Nhà cung cấp', function () {
-    expect(fn () => $this->suppliers->create(staffMember(Role::BanHang), 'Kinguin'))
+    expect(fn () => $this->suppliers->create(staffMember(Role::Sale), 'Kinguin'))
         ->toThrow(MissingRole::class);
 
     expect(Supplier::count())->toBe(0);
@@ -44,13 +42,13 @@ it('Quản trị và Nhập kho sửa và xoá được Nhà cung cấp', functi
 
     expect(Supplier::find($supplier->id))->toBeNull();
 })->with([
-    'Quản trị' => Role::Owner,
-    'Nhập kho' => Role::NhapKho,
+    'Quản trị' => Role::Admin,
+    'Nhập kho' => Role::Importer,
 ]);
 
 it('Bán hàng không sửa, không xoá được Nhà cung cấp', function () {
-    $supplier = $this->suppliers->create(staffMember(Role::NhapKho), 'Kinguin');
-    $seller = staffMember(Role::BanHang);
+    $supplier = $this->suppliers->create(staffMember(Role::Importer), 'Kinguin');
+    $seller = staffMember(Role::Sale);
 
     expect(fn () => $this->suppliers->update($seller, $supplier, 'Đổi tên', null))->toThrow(MissingRole::class)
         ->and(fn () => $this->suppliers->delete($seller, $supplier))->toThrow(MissingRole::class);
@@ -59,7 +57,7 @@ it('Bán hàng không sửa, không xoá được Nhà cung cấp', function () 
 });
 
 it('tên Nhà cung cấp không được trống và không trùng, không phân biệt hoa thường', function () {
-    $actor = staffMember(Role::NhapKho);
+    $actor = staffMember(Role::Importer);
     $kinguin = $this->suppliers->create($actor, 'Kinguin');
     $g2a = $this->suppliers->create($actor, 'G2A');
 

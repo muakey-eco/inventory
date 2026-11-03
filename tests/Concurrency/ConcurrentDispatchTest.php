@@ -20,7 +20,6 @@ use App\Models\Slot;
 use App\Models\StockLedgerEntry;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -32,11 +31,10 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function () {
     $this->artisan('migrate:fresh');
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
-    $admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->channel = app(SalesChannelDirectory::class)->create($admin, new SalesChannelDraft('Zalo'));
     $this->product = productOf(
         StockForm::OneTimeCode,

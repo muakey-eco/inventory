@@ -52,7 +52,7 @@ class ReplacementDelivery
      */
     public function preview(User $actor, DefectReport $report, ?Product $product = null): ReplacementPreview
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $delivery = Delivery::query()->with('stockUnit.product')->findOrFail($report->delivery_id);
         $original = self::originalDelivery($delivery);
@@ -94,7 +94,7 @@ class ReplacementDelivery
      */
     public function canReplace(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::BanHang)
+        return $this->roles->allows($actor, Role::Sale)
             && $report->isAwaitingReplacement()
             && ! $this->needsApproval($actor, $report, self::nextSequence(self::originalDelivery($report->delivery)));
     }
@@ -108,7 +108,7 @@ class ReplacementDelivery
      */
     public function requestApproval(User $actor, DefectReport $report): void
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         DB::transaction(function () use ($actor, $report): void {
             $current = self::lockAwaiting($report);
@@ -130,7 +130,7 @@ class ReplacementDelivery
      */
     public function canRequestApproval(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::BanHang)
+        return $this->roles->allows($actor, Role::Sale)
             && ! $this->roles->allows($actor)
             && $report->replacement_approval_requested_at === null
             && $this->isApprovable($report);
@@ -176,7 +176,7 @@ class ReplacementDelivery
      */
     public function replace(User $actor, DefectReport $report, ReplacementDraft $draft): Replacement
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $report, $draft): Replacement {

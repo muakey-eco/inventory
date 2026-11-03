@@ -34,19 +34,17 @@ use App\Models\RevealLogEntry;
 use App\Models\Slot;
 use App\Models\StockLedgerEntry;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
-    $this->otherSeller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
+    $this->otherSeller = staffMember(Role::Sale);
     $this->manual = app(ManualDispatch::class);
     $this->reveal = app(ContentReveal::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -220,7 +218,7 @@ it('Giao thêm báo lỗi kiểm tra và không thêm gì', function (Closure $l
 it('Bán hàng và Quản trị Giao thêm được, Nhập kho thì không', function () {
     additionalStock($this->steam, "SR1\tA-1\nSR2\tA-2");
     $dispatch = $this->manual->create($this->seller, new DispatchDraft($this->shopee, 'SP-001', additionalLines([[$this->steam, 1]])));
-    $stocker = staffMember(Role::NhapKho);
+    $stocker = staffMember(Role::Importer);
 
     expect($this->manual->canAddLines($this->seller, $dispatch))->toBeTrue()
         ->and($this->manual->canAddLines($this->admin, $dispatch))->toBeTrue()

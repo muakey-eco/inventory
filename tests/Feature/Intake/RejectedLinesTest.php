@@ -18,18 +18,16 @@ use App\Models\BatchLine;
 use App\Models\RevealLogEntry;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     // Disk nhập hàng như trên S3: purge không hỏi thời điểm ghi từng file.
     fakeObjectStorage('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
     $this->intake = app(BatchIntake::class);
-    $this->admin = staffMember(Role::Owner);
-    $this->clerk = staffMember(Role::NhapKho);
+    $this->admin = staffMember(Role::Admin);
+    $this->clerk = staffMember(Role::Importer);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->product = productOf(
         StockForm::OneTimeCode,
@@ -163,14 +161,14 @@ it('chỉ người tạo Lô nhập tải được; người khác bị từ ch�
     garenaBatchBy($this->clerk, new BatchLineDraft($this->product, 50_000, "SR002\tabc"));
     $line = BatchLine::sole();
 
-    expect(fn () => $this->intake->rejectedLines(staffMember(Role::NhapKho), $line))
+    expect(fn () => $this->intake->rejectedLines(staffMember(Role::Importer), $line))
         ->toThrow(InvalidBatch::class, 'Chỉ người tạo Lô nhập tải được dòng bị bỏ.')
         ->and(fn () => $this->intake->rejectedLines($this->admin, $line))
         ->toThrow(InvalidBatch::class, 'Chỉ người tạo Lô nhập tải được dòng bị bỏ.')
-        ->and(fn () => $this->intake->rejectedLines(staffMember(Role::BanHang), $line))
+        ->and(fn () => $this->intake->rejectedLines(staffMember(Role::Sale), $line))
         ->toThrow(MissingRole::class);
 
-    $this->clerk->removeRole(Role::NhapKho);
+    $this->clerk->forceFill(['roles' => []])->save();
 
     expect(fn () => $this->intake->rejectedLines($this->clerk->fresh(), $line))
         ->toThrow(MissingRole::class)

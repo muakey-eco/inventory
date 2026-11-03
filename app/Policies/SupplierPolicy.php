@@ -16,27 +16,27 @@ class SupplierPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function view(User $user, Supplier $supplier): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function update(User $user, Supplier $supplier): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function delete(User $user, Supplier $supplier): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function deleteAny(User $user): bool

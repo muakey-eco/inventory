@@ -47,18 +47,16 @@ use App\Models\Replacement;
 use App\Models\RevealLogEntry;
 use App\Models\StockLedgerEntry;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->reports = app(DefectReporting::class);
     $this->replacements = app(ReplacementDelivery::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -404,7 +402,7 @@ it('Đổi hàng không được và không đổi gì', function (Closure $arra
 
         return [test()->seller, confirmedDefect($broken), new ReplacementDraft(test()->netflix, productChangeReason: 'Hết Steam')];
     }, InvalidDispatch::class, 'Sản phẩm "Netflix 1 tháng" đã Ngừng bán.'],
-    'Nhập kho' => [fn (Delivery $broken) => [staffMember(Role::NhapKho), confirmedDefect($broken), new ReplacementDraft], MissingRole::class, ''],
+    'Nhập kho' => [fn (Delivery $broken) => [staffMember(Role::Importer), confirmedDefect($broken), new ReplacementDraft], MissingRole::class, ''],
 ]);
 
 it('Đơn vị hàng lỗi Phạm vi cả Đơn vị hàng không bị chọn lại khi Đổi hàng', function () {

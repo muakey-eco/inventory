@@ -104,7 +104,7 @@ class ContentReveal
      */
     public function revealDispatchResult(User $actor, Dispatch $dispatch): DispatchResultContent
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $dispatch): DispatchResultContent {
@@ -193,7 +193,7 @@ class ContentReveal
      */
     private function revealAfterResult(User $actor, Dispatch $dispatch, string $reason, callable $build): mixed
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $dispatch, $reason, $build): mixed {
@@ -222,7 +222,7 @@ class ContentReveal
      */
     public function revealDelivery(User $actor, Delivery $delivery): DeliveredContent
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $delivery): DeliveredContent {
@@ -319,7 +319,7 @@ class ContentReveal
     public function canRevealDelivery(User $actor, Delivery $delivery): bool
     {
         return $this->roles->allows($actor)
-            || ($this->roles->allows($actor, Role::BanHang) && ! CarbonImmutable::today()->gt($delivery->warrantyEndsOn()));
+            || ($this->roles->allows($actor, Role::Sale) && ! CarbonImmutable::today()->gt($delivery->warrantyEndsOn()));
     }
 
     /**
@@ -332,7 +332,7 @@ class ContentReveal
      */
     public function revealDefectReport(User $actor, DefectReport $report): DeliveredContent
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $report): DeliveredContent {
@@ -364,7 +364,7 @@ class ContentReveal
      */
     public function revealReplacement(User $actor, Replacement $replacement): DeliveredContent
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $replacement): DeliveredContent {
@@ -401,7 +401,7 @@ class ContentReveal
      */
     public function revealClaimUnit(User $actor, SupplierClaimUnit $claimUnit): RevealedContent
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $claimUnit): RevealedContent {
@@ -435,7 +435,7 @@ class ContentReveal
      */
     public function canRevealClaimUnit(User $actor, SupplierClaimUnit $claimUnit): bool
     {
-        return $this->roles->allows($actor, Role::NhapKho)
+        return $this->roles->allows($actor, Role::Importer)
             && $claimUnit->active
             && $claimUnit->stockUnit->status === StockUnitStatus::Defective;
     }

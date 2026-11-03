@@ -22,10 +22,10 @@ fi
 
 tag="$(git rev-parse --short=7 HEAD)"
 
-# Composer cần token GitHub đọc được repo private muakey-eco/filament-muakey-theme.
+# Composer cần token GitHub đọc được repo private muakey-eco/filament-muakey-theme và platform-laravel.
 if [ -z "${COMPOSER_AUTH:-}" ]; then
     if ! token="$(gh auth token 2>/dev/null)" || [ -z "$token" ]; then
-        echo "Thiếu token GitHub để đọc muakey-eco/filament-muakey-theme: đặt COMPOSER_AUTH hoặc chạy \`gh auth login\`." >&2
+        echo "Thiếu token GitHub để đọc muakey-eco/filament-muakey-theme và muakey-eco/platform-laravel: đặt COMPOSER_AUTH hoặc chạy \`gh auth login\`." >&2
         exit 1
     fi
     export COMPOSER_AUTH="{\"github-oauth\": {\"github.com\": \"${token}\"}}"

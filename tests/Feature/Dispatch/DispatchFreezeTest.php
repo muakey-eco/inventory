@@ -28,7 +28,6 @@ use App\Models\Dispatch;
 use App\Models\SecurityLogEntry;
 use App\Models\Slot;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -40,12 +39,11 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-17 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->freeze = app(DispatchFreeze::class);
     $this->manual = app(ManualDispatch::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');

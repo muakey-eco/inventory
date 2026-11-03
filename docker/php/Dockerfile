@@ -14,8 +14,8 @@ FROM dunglas/frankenphp:${FRANKENPHP_VERSION} AS base
 
 # Image đã có sẵn mbstring, dom, fileinfo, xmlreader, sodium, opcache.
 # Còn thiếu: pdo_pgsql (Postgres), intl (Number::fileSize), zip (openspout đọc/ghi XLSX),
-# bcmath, gd, exif.
-RUN install-php-extensions pdo_pgsql intl zip bcmath gd exif
+# bcmath, gd, exif, và redis để SDK platform đọc Phiên bản quyền từ Redis của platform (ADR 0011).
+RUN install-php-extensions pdo_pgsql intl zip bcmath gd exif redis
 
 COPY docker/php/conf.d/inventory.ini /usr/local/etc/php/conf.d/inventory.ini
 

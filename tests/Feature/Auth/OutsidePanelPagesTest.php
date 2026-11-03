@@ -1,24 +1,17 @@
 <?php
 
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 
 /*
- * Trang ngoài panel (trang chủ, bị từ chối, đã đăng xuất) đứng trong layout simple của Filament,
+ * Trang ngoài panel (trang chủ, đăng nhập không thành) đứng trong layout simple của Filament,
  * nên mang đủ Khung Muakey như trang đăng nhập của panel: CSS của Theme, logo lockup, font Inter
  * và Màu nhấn của app.
  */
 
 dataset('trang ngoài panel', [
     'trang chủ' => fn () => test()->get('/')->assertOk(),
-    'đã đăng xuất' => fn () => test()->get(route('filament.admin.auth.signed-out'))->assertOk(),
-    'bị từ chối' => function () {
-        config(['services.authentik.issuer' => 'https://auth-sap.shop.test/application/o/kho/']);
-        Http::fake(['auth-sap.shop.test/*' => Http::response('Bad Gateway', 502)]);
-
-        return test()->get(Filament::getLoginUrl())->assertForbidden();
-    },
+    'đăng nhập không thành' => fn () => test()->get('/admin/dang-nhap-loi?reason=no-access')->assertOk(),
 ]);
 
 it('đứng trong Khung Muakey', function (TestResponse $response) {
@@ -38,6 +31,18 @@ it('trang chủ dẫn vào kho', function () {
 });
 
 it('mỗi trang có tiêu đề riêng trên tab', function () {
-    expect($this->get(route('filament.admin.auth.signed-out'))->getContent())
-        ->toMatch('/<title>\s*Đã đăng xuất\s*-\s*Kho hàng số\s*<\/title>/u');
+    expect($this->get('/admin/dang-nhap-loi?reason=no-access')->getContent())
+        ->toMatch('/<title>\s*Không vào được kho\s*-\s*Kho hàng số\s*<\/title>/u');
 });
+
+it('trang đăng nhập không thành nói rõ lý do và cho thử lại', function (string $reason, string $message) {
+    $this->get('/admin/dang-nhap-loi?reason='.$reason)
+        ->assertOk()
+        ->assertSee($message)
+        ->assertSee('/admin/auth/login?returnTo=%2Fadmin', escape: false);
+})->with([
+    'không có quyền' => ['no-access', 'Bạn chưa được cấp quyền vào kho, hoặc tài khoản đang bị đình chỉ trên platform.'],
+    'platform không trả lời' => ['unavailable', 'Kho không hỏi được platform để kiểm quyền.'],
+    'lượt đăng nhập hỏng' => ['login-failed', 'Lượt đăng nhập này hết hạn hoặc bị từ chối giữa chừng.'],
+    'lý do lạ' => ['la-lam', 'Lượt đăng nhập này hết hạn hoặc bị từ chối giữa chừng.'],
+]);

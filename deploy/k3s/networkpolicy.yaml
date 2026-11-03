@@ -2,7 +2,7 @@
 # ingress. k3s thực thi NetworkPolicy sẵn (kube-router nhúng trong k3s).
 #
 # Chỉ chặn CHIỀU VÀO. Chiều ra vẫn mở: Postgres ngoài cluster, bucket S3,
-# Authentik.
+# platform (`/v1` và Redis trong namespace `platform`).
 
 # Mặc định: không pod nào trong namespace nhận kết nối nào. `queue`,
 # `scheduler` và Job `migrate` chỉ gọi ra.
@@ -14,10 +14,11 @@ spec:
   podSelector: {}
   policyTypes: ["Ingress"]
 ---
-# `web`: từ ingress-nginx và từ Authentik (back-channel logout gọi thẳng
-# Service). ingress-nginx chạy `hostNetwork`, nên không lọc được theo namespace
-# hay nhãn pod: traffic của nó vào pod mang IP nguồn của `cni0` (`10.42.N.1`)
-# hoặc `flannel.1` (`10.42.N.0`) của node, nằm TRONG dải pod.
+# `web`: từ ingress-nginx và từ platform (back-channel logout và webhook
+# `user.*` gọi thẳng Service). ingress-nginx chạy `hostNetwork`, nên không lọc
+# được theo namespace hay nhãn pod: traffic của nó vào pod mang IP nguồn của
+# `cni0` (`10.42.N.1`) hoặc `flannel.1` (`10.42.N.0`) của node, nằm TRONG dải
+# pod.
 #
 # Hệ quả: mọi pod trong cluster vẫn gọi thẳng được `web` và giả được
 # `X-Forwarded-For` (ADR 0009). Policy này chỉ chặn được những gì đến từ ngoài

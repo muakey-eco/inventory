@@ -13,12 +13,10 @@ use App\Inventory\Catalog\ProductTypeCatalog;
 use App\Inventory\Catalog\ProductTypeDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Models\Product;
-use Database\Seeders\RoleSeeder;
 
 beforeEach(function () {
-    $this->seed(RoleSeeder::class);
     $this->catalog = app(ProductCatalog::class);
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->accountType = productTypeOf(StockForm::Account, [
         new ContentFieldDraft('username', 'Tên đăng nhập', ContentFieldType::Email, dedupeKey: true),
         new ContentFieldDraft('password', 'Mật khẩu'),
@@ -73,8 +71,8 @@ it('chỉ Quản trị tạo được Sản phẩm', function (Role $role) {
 
     expect(Product::count())->toBe(0);
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);
 
 it('từ chối cấu hình Sản phẩm không hợp lệ', function (ProductDraft $draft) {
@@ -146,8 +144,8 @@ it('chỉ Quản trị sửa được Sản phẩm', function (Role $role) {
 
     expect($product->fresh()->name)->toBe('Netflix Premium 1 tháng');
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);
 
 it('Sản phẩm chưa có hàng chuyển được sang Loại sản phẩm khác', function () {
@@ -263,8 +261,8 @@ it('chỉ Quản trị Ngừng bán được Sản phẩm', function (Role $role
 
     expect($product->fresh()->isDiscontinued())->toBeFalse();
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);
 
 it('Quản trị xoá được Sản phẩm chưa có hàng', function () {
@@ -293,6 +291,6 @@ it('chỉ Quản trị xoá được Sản phẩm', function (Role $role) {
 
     expect(Product::find($product->id))->not->toBeNull();
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);

@@ -26,7 +26,7 @@ class DispatchEditor
      */
     public function edit(User $actor, Dispatch $dispatch, DispatchEdit $edit): Dispatch
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $ref = trim((string) $edit->externalRef);
 
@@ -93,7 +93,7 @@ class DispatchEditor
      */
     public function canEdit(User $actor, Dispatch $dispatch): bool
     {
-        return $dispatch->status === DispatchStatus::Completed && $this->roles->allows($actor, Role::BanHang);
+        return $dispatch->status === DispatchStatus::Completed && $this->roles->allows($actor, Role::Sale);
     }
 
     /**

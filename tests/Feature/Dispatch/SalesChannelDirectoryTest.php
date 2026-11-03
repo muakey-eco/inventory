@@ -8,12 +8,10 @@ use App\Inventory\Dispatch\SalesChannelDirectory;
 use App\Inventory\Dispatch\SalesChannelDraft;
 use App\Inventory\Dispatch\SalesChannelType;
 use App\Models\SalesChannel;
-use Database\Seeders\RoleSeeder;
 
 beforeEach(function () {
-    $this->seed(RoleSeeder::class);
     $this->channels = app(SalesChannelDirectory::class);
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
 });
 
 it('Quản trị khai báo Kênh bán thủ công với cờ bắt buộc mã đơn ngoài', function () {
@@ -38,8 +36,8 @@ it('chỉ Quản trị khai báo, sửa và ẩn được Kênh bán', function 
         ->and(SalesChannel::count())->toBe(1)
         ->and($channel->fresh()->isHidden())->toBeFalse();
 })->with([
-    'Nhập kho' => [Role::NhapKho],
-    'Bán hàng' => [Role::BanHang],
+    'Nhập kho' => [Role::Importer],
+    'Bán hàng' => [Role::Sale],
 ]);
 
 it('tên Kênh bán bắt buộc và duy nhất, không phân biệt hoa thường', function () {

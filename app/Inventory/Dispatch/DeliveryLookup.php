@@ -35,7 +35,7 @@ class DeliveryLookup
      */
     public function byDedupeKey(User $actor, #[SensitiveParameter] string $value): Collection
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         // Sai khoá HMAC thì mọi hash lệch và tra cứu âm thầm không thấy gì: báo lỗi thay vì trả rỗng.
         $this->fingerprints->verify();
 

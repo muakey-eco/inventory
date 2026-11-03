@@ -182,6 +182,13 @@ return [
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
+        // Redis của platform, chỉ để SDK đọc Phiên bản quyền `pv:{userId}` bằng user `apps` chỉ-đọc
+        // (ADR 0011). SDK tự dựng connection, bỏ `options` ở trên. Dev để trống và đặt
+        // `PLATFORM_VERSION_SOURCE=api`: Redis đó không ra ngoài cụm.
+        'platform' => [
+            'url' => env('PLATFORM_REDIS_URL'),
+        ],
+
     ],
 
 ];

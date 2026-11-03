@@ -21,18 +21,16 @@ use App\Models\RevealLogEntry;
 use App\Models\Slot;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
     $this->reveal = app(ContentReveal::class);
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
 
     $product = productOf(
         StockForm::OneTimeCode,
@@ -98,8 +96,8 @@ it('vai trò khác Quản trị không xem được hàng Còn hàng và không 
         ->toThrow(MissingRole::class)
         ->and(RevealLogEntry::count())->toBe(0);
 })->with([
-    'Nhập kho' => [Role::NhapKho],
-    'Bán hàng' => [Role::BanHang],
+    'Nhập kho' => [Role::Importer],
+    'Bán hàng' => [Role::Sale],
 ]);
 
 it('Quản trị đã bị Khoá nhân viên không xem được', function () {

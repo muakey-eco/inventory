@@ -11,17 +11,15 @@ use App\Inventory\Dispatch\SalesChannelDraft;
 use App\Inventory\Dispatch\SalesChannelType;
 use App\Inventory\Encryption\KeyFingerprints;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-16 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->keys = app(ApiKeys::class);
     $this->channels = app(SalesChannelDirectory::class);
     $this->website = $this->channels->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api));

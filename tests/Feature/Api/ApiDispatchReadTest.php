@@ -14,7 +14,6 @@ use App\Inventory\Encryption\KeyFingerprints;
 use App\Models\Delivery;
 use App\Models\RevealLogEntry;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 
@@ -25,12 +24,11 @@ use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-16 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->website = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api));
     $this->secret = app(ApiKeys::class)->issue($this->admin, $this->website)->secret;
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');

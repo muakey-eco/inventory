@@ -49,7 +49,7 @@ class DefectReporting
      */
     public function report(User $actor, array $deliveries, DefectReportDraft $draft): array
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $description = trim($draft->description);
 
@@ -116,7 +116,7 @@ class DefectReporting
      */
     public function canReport(User $actor, Delivery $delivery): bool
     {
-        return $this->roles->allows($actor, Role::BanHang)
+        return $this->roles->allows($actor, Role::Sale)
             && self::reportBlocker($delivery) === null
             && (self::warrantyProblem($delivery) === null || $this->roles->allows($actor));
     }
@@ -139,7 +139,7 @@ class DefectReporting
      */
     public function rejectedReports(User $actor, array $deliveries): Collection
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         return DefectReport::query()
             ->with(['creator', 'verifier'])
@@ -159,7 +159,7 @@ class DefectReporting
      */
     public function confirm(User $actor, DefectReport $report, DefectScope $scope, string $note): void
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $note = self::verificationNote($note);
 
         DB::transaction(function () use ($actor, $report, $scope, $note): void {
@@ -191,7 +191,7 @@ class DefectReporting
      */
     public function reject(User $actor, DefectReport $report, string $note): void
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $note = self::verificationNote($note);
 
         DB::transaction(fn () => self::recordVerification(self::lockPending($report), $actor, DefectReportStatus::Rejected, $note, null));
@@ -202,7 +202,7 @@ class DefectReporting
      */
     public function canVerify(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::BanHang) && $report->status === DefectReportStatus::Pending;
+        return $this->roles->allows($actor, Role::Sale) && $report->status === DefectReportStatus::Pending;
     }
 
     /**
@@ -215,7 +215,7 @@ class DefectReporting
      */
     public function declineReplacement(User $actor, DefectReport $report, string $reason, bool $refunded): void
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $reason = trim($reason);
 
         if ($reason === '') {
@@ -249,7 +249,7 @@ class DefectReporting
      */
     public function canDeclineReplacement(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::BanHang) && $report->isAwaitingReplacement();
+        return $this->roles->allows($actor, Role::Sale) && $report->isAwaitingReplacement();
     }
 
     /**
@@ -262,7 +262,7 @@ class DefectReporting
      */
     public function affectedDeliveries(User $actor, DefectReport $report): array
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $current = DefectReport::query()->with('stockUnit')->findOrFail($report->getKey());
 
@@ -303,7 +303,7 @@ class DefectReporting
      */
     public function confirmAffected(User $actor, DefectReport $source, array $deliveries, ?string $overrideReason = null): array
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         return DB::transaction(function () use ($actor, $source, $deliveries, $overrideReason): array {
             $current = DefectReport::query()->with('stockUnit')->sharedLock()->findOrFail($source->getKey());

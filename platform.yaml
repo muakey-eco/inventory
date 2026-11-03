@@ -1,0 +1,33 @@
+# Manifest platform của kho: permission và role mà App khai với platform (ADR 0011). Áp bằng
+# `platform-cli sync` ở máy deploy, trước khi rollout image mới (README, mục "Đăng nhập qua
+# platform").
+#
+# Mỗi Vai trò của kho là đúng một Permission cùng tên (`App\Inventory\Access\Role`), và role cùng
+# tên trên platform cấp Permission đó cùng Permission vào cửa `access`. Platform chỉ trả Permission
+# cho App, không trả role: đổi tên một permission ở đây là cả kho mất Vai trò đó.
+version: 1
+home_url: https://kho.muakeyoffice.net
+permissions:
+  # Permission vào cửa (ADR-0007 của platform): thiếu thì không vào được `/admin`.
+  access:
+    description: Vào kho hàng số
+  admin:
+    description: Quản trị, chủ shop, làm được mọi việc trong kho
+  importer:
+    description: Nhập kho, nhập hàng và làm việc với Nhà cung cấp
+  sale:
+    description: Bán hàng, xuất kho và xử lý sau giao
+roles:
+  admin:
+    description: Quản trị
+    permissions: [access, admin]
+  importer:
+    description: Nhập kho
+    permissions: [access, importer]
+  sale:
+    description: Bán hàng
+    permissions: [access, sale]
+# Bản sao danh bạ: platform chỉ gửi webhook tới Service trong cụm.
+webhook:
+  url: http://web.inventory.svc:8000/admin/auth/webhook
+  events: ['user.*']

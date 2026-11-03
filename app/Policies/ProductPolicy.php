@@ -17,32 +17,32 @@ class ProductPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     public function view(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function update(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function discontinue(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Owner) && ! $product->isDiscontinued();
+        return $this->roles->allows($user, Role::Admin) && ! $product->isDiscontinued();
     }
 
     public function delete(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Owner) && ! $product->hasStock();
+        return $this->roles->allows($user, Role::Admin) && ! $product->hasStock();
     }
 
     public function deleteAny(User $user): bool

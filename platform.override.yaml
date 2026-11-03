@@ -1,0 +1,5 @@
+# Phần của App thử `inventory-dev` khác App gốc (ADR-0024 của platform). `platform-cli sync` chỉ phủ
+# file này khi chạy bằng Client CI `inventory-dev-ci`. App thử không nhận webhook, nên Bản sao danh
+# bạ trên máy dev chỉ có lệnh quét bù.
+home_url: http://localhost:8080
+webhook: null

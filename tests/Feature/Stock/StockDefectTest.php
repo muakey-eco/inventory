@@ -36,19 +36,17 @@ use App\Models\Slot;
 use App\Models\StockLedgerEntry;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->defects = app(StockDefect::class);
     $this->stock = app(SellableStock::class);
     $this->netflix = productOf(

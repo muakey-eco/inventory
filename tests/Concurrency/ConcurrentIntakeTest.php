@@ -17,7 +17,6 @@ use App\Models\StockLedgerEntry;
 use App\Models\StockUnit;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -30,10 +29,9 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function () {
     $this->artisan('migrate:fresh');
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->intake = app(BatchIntake::class);
 });

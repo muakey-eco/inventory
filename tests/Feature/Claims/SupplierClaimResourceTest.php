@@ -25,7 +25,6 @@ use App\Models\RevealLogEntry;
 use App\Models\StockUnit;
 use App\Models\SupplierClaim;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Support\Facades\Storage;
@@ -34,12 +33,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('intake');
     Repeater::fake();
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->stocker = staffMember(Role::NhapKho);
+    $this->admin = staffMember(Role::Admin);
+    $this->stocker = staffMember(Role::Importer);
     $this->netflix = productOf(
         StockForm::Account,
         [
@@ -76,9 +74,9 @@ it('Quản trị và Nhập kho vào được trang Khiếu nại nhà cung cấ
     $this->get(SupplierClaimResource::getUrl('index'))->assertStatus($sees ? 200 : 403);
     $this->get(SupplierClaimResource::getUrl('create'))->assertStatus($sees ? 200 : 403);
 })->with([
-    'Quản trị' => [Role::Owner, true],
-    'Nhập kho' => [Role::NhapKho, true],
-    'Bán hàng' => [Role::BanHang, false],
+    'Quản trị' => [Role::Admin, true],
+    'Nhập kho' => [Role::Importer, true],
+    'Bán hàng' => [Role::Sale, false],
 ]);
 
 it('Nhập kho tạo Khiếu nại từ bảng Đơn vị hàng Lỗi chưa khiếu nại; khác Nhà cung cấp thì báo lỗi', function () {

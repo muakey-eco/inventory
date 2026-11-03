@@ -16,17 +16,17 @@ class UserPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function view(User $user, User $staff): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function update(User $user, User $staff): bool

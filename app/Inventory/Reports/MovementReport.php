@@ -47,7 +47,7 @@ class MovementReport
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     /**
@@ -55,7 +55,7 @@ class MovementReport
      */
     public function seesValues(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     /**
@@ -67,10 +67,10 @@ class MovementReport
      */
     public function query(User $actor, MovementReportFilter $filter): Builder
     {
-        $this->roles->authorize($actor, Role::NhapKho, Role::BanHang);
+        $this->roles->authorize($actor, Role::Importer, Role::Sale);
 
         if ($filter->supplierId !== null) {
-            $this->roles->authorize($actor, Role::NhapKho);
+            $this->roles->authorize($actor, Role::Importer);
         }
 
         $sources = self::sources($filter);

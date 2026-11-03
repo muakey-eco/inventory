@@ -4,24 +4,22 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Support\NavGroup;
-use App\Http\Controllers\Auth\AuthentikCallback;
-use App\Http\Controllers\Auth\DevSignIn;
-use App\Http\Controllers\Auth\RedirectToAuthentik;
-use App\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
+use App\Http\Middleware\EndIdleAppSession;
+use App\Http\Middleware\SyncRoleSnapshot;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Muakey\FilamentTheme\MuakeyColor;
 use Muakey\FilamentTheme\MuakeyThemePlugin;
+use Muakey\Platform\Filament\PlatformPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -31,20 +29,13 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            // Đăng nhập chỉ qua Authentik (ADR 0008): trang đăng nhập của panel chuyển thẳng
-            // sang đó, không có mật khẩu, 2FA hay trang hồ sơ trong kho.
-            ->login(RedirectToAuthentik::class)
-            ->routes(function (): void {
-                Route::get('/auth/callback', AuthentikCallback::class)->name('auth.authentik.callback');
-                Route::view('/auth/da-dang-xuat', 'auth.signed-out')->name('auth.signed-out');
-
-                // Route image production được cache lúc build với APP_ENV mặc định là production,
-                // nên đăng nhập giả không lọt vào đó; DevSignIn vẫn tự kiểm lại.
-                if (app()->isLocal()) {
-                    Route::get('/auth/dev', [DevSignIn::class, 'index'])->name('auth.dev');
-                    Route::post('/auth/dev/{user}', [DevSignIn::class, 'store'])->name('auth.dev.store');
-                }
-            })
+            // Đăng nhập chỉ qua platform (ADR 0011): màn login thành redirect sang platform, nút
+            // đăng xuất kết thúc cả Phiên SSO, panel gác bằng guard `platform`. Không có mật
+            // khẩu, 2FA hay trang hồ sơ trong kho.
+            ->plugin(PlatformPlugin::make())
+            // Báo tiếng Việt khi Phiên App chết giữa chừng (hết 2 giờ không thao tác, đăng xuất ở
+            // App khác, mất quyền), thay cho hộp thoại tiếng Anh của Livewire.
+            ->renderHook(PanelsRenderHook::SCRIPTS_AFTER, fn (): string => view('filament.session-expired')->render())
             // Tên app không chứa chữ "Muakey": logo mặc định của Theme đã có wordmark đó.
             ->brandName('Kho hàng số')
             // Theme khoá Khung (font, bảng gray, Màu ngữ nghĩa, bo góc). App chỉ chọn Màu nhấn, khác
@@ -64,15 +55,17 @@ class AdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
-                AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // Sau `Authenticate` của SDK (plugin khai trước): cả hai chạy ở mọi request, kể cả
+            // request Livewire update.
             ->authMiddleware([
-                Authenticate::class,
+                EndIdleAppSession::class,
+                SyncRoleSnapshot::class,
             ], isPersistent: true);
     }
 }

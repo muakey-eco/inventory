@@ -17,19 +17,17 @@ use App\Inventory\Intake\BatchIntake;
 use App\Inventory\Intake\BatchLineDraft;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->stocker = staffMember(Role::NhapKho);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->stocker = staffMember(Role::Importer);
+    $this->seller = staffMember(Role::Sale);
 
     $this->netflix = productOf(
         StockForm::Account,
@@ -73,9 +71,9 @@ it('cả ba vai trò vào được báo cáo Nhập/xuất; nhân viên không c
 
     $this->get(MovementReportPage::getUrl())->assertStatus($sees ? 200 : 403);
 })->with([
-    'Quản trị' => [Role::Owner, true],
-    'Nhập kho' => [Role::NhapKho, true],
-    'Bán hàng' => [Role::BanHang, true],
+    'Quản trị' => [Role::Admin, true],
+    'Nhập kho' => [Role::Importer, true],
+    'Bán hàng' => [Role::Sale, true],
     'không vai trò' => [null, false],
 ]);
 
@@ -91,9 +89,9 @@ it('Bán hàng không thấy cột Giá vốn, Giá bán và bộ lọc Nhà cun
 
     $values ? $page->assertTableFilterVisible('supplier') : $page->assertTableFilterHidden('supplier');
 })->with([
-    'Quản trị' => [Role::Owner, true],
-    'Nhập kho' => [Role::NhapKho, true],
-    'Bán hàng' => [Role::BanHang, false],
+    'Quản trị' => [Role::Admin, true],
+    'Nhập kho' => [Role::Importer, true],
+    'Bán hàng' => [Role::Sale, false],
 ]);
 
 it('bảng hiện số liệu của MovementReport; lọc khoảng ngày và Sản phẩm', function () {

@@ -125,7 +125,7 @@ class DispatchDeliveries extends TableWidget
                     ->modalDescription('Mỗi Slot một Báo lỗi Chờ xác minh; trong lúc chờ, Slot còn trong kho của cùng Đơn vị hàng tạm ngừng bán.')
                     ->modalSubmitActionLabel('Tạo Báo lỗi')
                     ->schema(fn (Collection $records): array => self::reportSchema(self::selectedDeliveries($records)))
-                    ->visible(fn (RoleGate $roles): bool => $roles->allows(InventoryAction::actor(), Role::BanHang))
+                    ->visible(fn (RoleGate $roles): bool => $roles->allows(InventoryAction::actor(), Role::Sale))
                     ->deselectRecordsAfterCompletion()
                     ->action(fn (BulkAction $action, Collection $records, array $data, DefectReporting $reports) => self::report($action, $reports, self::selectedDeliveries($records), $data)),
             ])

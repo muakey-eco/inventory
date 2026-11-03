@@ -16,12 +16,12 @@ class StockUnitPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     public function view(User $user, StockUnit $stockUnit): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     public function create(User $user): bool

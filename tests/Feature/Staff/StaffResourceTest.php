@@ -6,28 +6,23 @@ use App\Inventory\Access\Role;
 use App\Inventory\Security\SecurityEvent;
 use App\Models\SecurityLogEntry;
 use App\Models\User;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
-
-beforeEach(function () {
-    $this->seed(RoleSeeder::class);
-});
 
 it('chỉ Quản trị vào được trang Nhân viên', function (Role $role, int $status) {
     $this->actingAs(staffMember($role))
         ->get(StaffResource::getUrl('index'))
         ->assertStatus($status);
 })->with([
-    'Quản trị' => [Role::Owner, 200],
-    'Nhập kho' => [Role::NhapKho, 403],
-    'Bán hàng' => [Role::BanHang, 403],
+    'Quản trị' => [Role::Admin, 200],
+    'Nhập kho' => [Role::Importer, 403],
+    'Bán hàng' => [Role::Sale, 403],
 ]);
 
 it('không có thao tác tạo nhân viên, đổi Vai trò hay reset 2FA', function () {
-    $this->actingAs(staffMember(Role::Owner));
-    $seller = staffMember(Role::BanHang);
+    $this->actingAs(staffMember(Role::Admin));
+    $seller = staffMember(Role::Sale);
 
     Livewire::test(ManageStaff::class)
         ->assertActionDoesNotExist(CreateAction::class)
@@ -35,17 +30,17 @@ it('không có thao tác tạo nhân viên, đổi Vai trò hay reset 2FA', func
         ->assertActionDoesNotExist(TestAction::make('resetTwoFactor')->table($seller));
 });
 
-it('Vai trò hiện chỉ đọc trên danh sách', function () {
-    $this->actingAs(staffMember(Role::Owner));
-    $seller = staffMember(Role::BanHang, Role::NhapKho);
+it('Vai trò hiện chỉ đọc trên danh sách, theo lần cuối kho thấy', function () {
+    $this->actingAs(staffMember(Role::Admin));
+    $seller = staffMember(Role::Sale, Role::Importer);
 
     Livewire::test(ManageStaff::class)
-        ->assertTableColumnStateSet('roles.name', [Role::NhapKho->value, Role::BanHang->value], $seller);
+        ->assertTableColumnStateSet('roles', [Role::Importer->value, Role::Sale->value], $seller);
 });
 
 it('Quản trị Khoá rồi mở khoá nhân viên từ panel', function () {
-    $this->actingAs(staffMember(Role::Owner));
-    $seller = staffMember(Role::BanHang);
+    $this->actingAs(staffMember(Role::Admin));
+    $seller = staffMember(Role::Sale);
 
     Livewire::test(ManageStaff::class)
         ->callAction(TestAction::make('deactivate')->table($seller))
@@ -60,7 +55,7 @@ it('Quản trị Khoá rồi mở khoá nhân viên từ panel', function () {
 });
 
 it('panel báo lỗi thay vì Khoá Quản trị đang hoạt động cuối cùng', function () {
-    $this->actingAs($admin = staffMember(Role::Owner));
+    $this->actingAs($admin = staffMember(Role::Admin));
 
     Livewire::test(ManageStaff::class)
         ->callAction(TestAction::make('deactivate')->table($admin))
@@ -70,8 +65,8 @@ it('panel báo lỗi thay vì Khoá Quản trị đang hoạt động cuối cù
 });
 
 it('không có thao tác xoá nhân viên, kể cả với Quản trị', function () {
-    $this->actingAs($admin = staffMember(Role::Owner));
-    $seller = staffMember(Role::BanHang);
+    $this->actingAs($admin = staffMember(Role::Admin));
+    $seller = staffMember(Role::Sale);
 
     Livewire::test(ManageStaff::class)
         ->assertActionDoesNotExist(TestAction::make('delete')->table($seller))

@@ -37,18 +37,16 @@ use App\Models\Slot;
 use App\Models\StockLedgerEntry;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->manual = app(ManualDispatch::class);
     $this->corrective = app(CorrectiveDelivery::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -292,7 +290,7 @@ it('Giao thay báo lỗi và không đổi gì', function (Closure $arrange, str
 
         return [test()->seller, new CorrectionDraft(null, contentSent: false)];
     }, InvalidDispatch::class, 'Chỉ Giao thay được trên Phiếu xuất Hoàn tất.'],
-    'Nhập kho' => [fn () => [staffMember(Role::NhapKho), new CorrectionDraft(null, contentSent: false)], MissingRole::class, ''],
+    'Nhập kho' => [fn () => [staffMember(Role::Importer), new CorrectionDraft(null, contentSent: false)], MissingRole::class, ''],
 ]);
 
 it('Sửa phiếu không đặt được Giá bán cho Dòng xuất loại Giao thay; để trống vẫn lưu được', function () {

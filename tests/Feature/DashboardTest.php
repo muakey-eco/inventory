@@ -42,7 +42,6 @@ use App\Models\Delivery;
 use App\Models\StockUnit;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -54,13 +53,12 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-16 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->stocker = staffMember(Role::NhapKho);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->stocker = staffMember(Role::Importer);
+    $this->seller = staffMember(Role::Sale);
 
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $channels = app(SalesChannelDirectory::class);
@@ -117,9 +115,9 @@ it('mỗi Vai trò thấy đúng widget của công việc mình làm, số ô k
         }
     }
 })->with([
-    'Quản trị' => [Role::Owner, [OutboundQueue::class, IntakeQueue::class, StockSummary::class, OwnerQueue::class]],
-    'Nhập kho' => [Role::NhapKho, [IntakeQueue::class, StockSummary::class]],
-    'Bán hàng' => [Role::BanHang, [OutboundQueue::class, StockSummary::class]],
+    'Quản trị' => [Role::Admin, [OutboundQueue::class, IntakeQueue::class, StockSummary::class, OwnerQueue::class]],
+    'Nhập kho' => [Role::Importer, [IntakeQueue::class, StockSummary::class]],
+    'Bán hàng' => [Role::Sale, [OutboundQueue::class, StockSummary::class]],
     'không vai trò' => [null, []],
 ]);
 

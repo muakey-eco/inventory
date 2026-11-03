@@ -38,7 +38,7 @@ class DefectRateReport
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     /**
@@ -51,7 +51,7 @@ class DefectRateReport
      */
     public function rows(User $actor, DefectRateReportFilter $filter): array
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         $rows = [];
 

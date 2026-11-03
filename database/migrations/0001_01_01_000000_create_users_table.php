@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,23 +12,28 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Nhân viên đăng nhập qua platform (ADR 0011): không mật khẩu, không TOTP, nhận diện bằng
+        // id trên platform. Lúc viết, kho chưa chạy production nên sửa thẳng migration này.
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->uuid('platform_user_id')->unique();
             $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
-            $table->text('app_authentication_secret')->nullable();
-            $table->text('app_authentication_recovery_codes')->nullable();
-            $table->rememberToken();
+            // Email chỉ là bản sao từ platform, không phải danh tính: một email cũ có thể sang
+            // tay người khác.
+            $table->string('email')->nullable();
+            // Bản chụp Vai trò theo lần cuối kho thấy nhân viên, danh sách giá trị của `Role`.
+            $table->jsonb('roles')->default('[]');
+            // Mất quyền theo platform (bị đình chỉ hoặc bị xoá), theo Bản sao danh bạ. Cột riêng,
+            // không dùng chung `deactivated_at`: nó tự hết khi platform cấp lại quyền, còn Khoá
+            // nhân viên thì chỉ Quản trị mở được.
+            $table->timestampTz('platform_revoked_at')->nullable();
+            $table->string('platform_revoked_reason')->nullable();
+            // `seq` của bản danh bạ mới nhất đã nhận, để bỏ bản tới trễ hoặc tới lặp.
+            $table->unsignedBigInteger('directory_seq')->nullable();
             $table->timestamps();
         });
 
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
-            $table->string('token');
-            $table->timestamp('created_at')->nullable();
-        });
+        DB::statement('ALTER TABLE users ADD CONSTRAINT users_platform_revoked_reason_with_time CHECK ((platform_revoked_at IS NULL) = (platform_revoked_reason IS NULL))');
 
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
@@ -45,7 +51,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
     }
 };

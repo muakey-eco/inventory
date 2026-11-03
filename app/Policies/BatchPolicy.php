@@ -17,22 +17,22 @@ class BatchPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function view(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     public function confirm(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     /**
@@ -42,7 +42,7 @@ class BatchPolicy
      */
     public function revise(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     /**
@@ -51,7 +51,7 @@ class BatchPolicy
      */
     public function recordInvoiceTotal(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::NhapKho);
+        return $this->roles->allows($user, Role::Importer);
     }
 
     /**

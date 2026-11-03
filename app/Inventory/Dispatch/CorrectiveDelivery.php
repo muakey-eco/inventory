@@ -46,7 +46,7 @@ class CorrectiveDelivery
      */
     public function preview(User $actor, Delivery $delivery): CorrectionPreview
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $current = Delivery::query()->with('stockUnit.product')->findOrFail($delivery->getKey());
 
@@ -66,7 +66,7 @@ class CorrectiveDelivery
      */
     public function canCorrect(User $actor, Delivery $delivery): bool
     {
-        return $this->roles->allows($actor, Role::BanHang)
+        return $this->roles->allows($actor, Role::Sale)
             && $delivery->dispatchLine->dispatch->status === DispatchStatus::Completed
             && $delivery->slot->status === SlotStatus::Delivered
             && ! self::isReplacement($delivery)
@@ -85,7 +85,7 @@ class CorrectiveDelivery
      */
     public function correct(User $actor, Delivery $delivery, CorrectionDraft $draft): Delivery
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         if ($draft->voidUnit && ! $draft->contentSent) {
             throw new InvalidDispatch([new DispatchProblem('Chỉ Huỷ hàng cả Đơn vị hàng khi nội dung đã gửi cho khách.')]);

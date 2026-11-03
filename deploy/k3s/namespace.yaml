@@ -2,3 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: inventory
+  # NetworkPolicy của platform chỉ nhận `/v1` và Redis từ namespace mang nhãn
+  # này (ADR 0011).
+  labels:
+    muakey.io/app: "true"

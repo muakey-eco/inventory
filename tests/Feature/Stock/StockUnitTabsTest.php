@@ -18,19 +18,17 @@ use App\Inventory\Warranty\DefectReporting;
 use App\Models\DefectReport;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->netflix = productOf(
         StockForm::Account,

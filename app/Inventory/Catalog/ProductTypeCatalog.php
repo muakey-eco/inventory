@@ -36,7 +36,7 @@ class ProductTypeCatalog
      */
     public function create(User $actor, ProductTypeDraft $draft): ProductType
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
         self::validate($draft);
 
         return self::guardName($draft, fn (): ProductType => DB::transaction(
@@ -52,7 +52,7 @@ class ProductTypeCatalog
      */
     public function preview(User $actor, ProductType $type, ProductTypeDraft $draft): ProductTypeChange
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
         self::validate($draft, $type);
 
         return self::change($type, $draft);
@@ -69,7 +69,7 @@ class ProductTypeCatalog
      */
     public function update(User $actor, ProductType $type, ProductTypeDraft $draft): ProductType
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
 
         return self::guardName($draft, fn (): ProductType => DB::transaction(function () use ($type, $draft): ProductType {
             $current = ProductType::query()->lockForUpdate()->findOrFail($type->getKey());
@@ -100,7 +100,7 @@ class ProductTypeCatalog
      */
     public function discontinue(User $actor, ProductType $type): void
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
 
         $type->forceFill(['discontinued_at' => $type->discontinued_at ?? now()])->save();
     }
@@ -113,7 +113,7 @@ class ProductTypeCatalog
      */
     public function delete(User $actor, ProductType $type): void
     {
-        $this->roles->authorize($actor, Role::Owner);
+        $this->roles->authorize($actor, Role::Admin);
 
         DB::transaction(function () use ($type): void {
             $current = ProductType::query()->lockForUpdate()->findOrFail($type->getKey());

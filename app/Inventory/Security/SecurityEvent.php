@@ -3,21 +3,20 @@
 namespace App\Inventory\Security;
 
 /**
- * Loại sự kiện ghi vào Nhật ký bảo mật. Các sự kiện của đường mật khẩu + TOTP cũ đã xoá hẳn
- * cùng đường đó (ADR 0008): lúc xoá, kho chưa chạy production nên không có dòng cũ nào phải đọc lại.
+ * Loại sự kiện ghi vào Nhật ký bảo mật. Các sự kiện của đường mật khẩu + TOTP cũ và của IdP trước
+ * platform (đăng nhập bị từ chối, thiếu MFA, IdP huỷ phiên) đã xoá hẳn cùng đường đó (ADR 0008,
+ * ADR 0011): platform từ chối trước khi tới kho. Lúc xoá, kho chưa chạy production nên không có
+ * dòng cũ nào phải đọc lại.
  */
 enum SecurityEvent: string
 {
     case LoginSucceeded = 'login_succeeded';
-    case LoginRefused = 'login_refused';
-    case LoginWithoutMfa = 'login_without_mfa';
     case StaffFirstSeen = 'staff_first_seen';
     case RolesChanged = 'roles_changed';
     case StaffDeactivated = 'staff_deactivated';
     case StaffReactivated = 'staff_reactivated';
-    case AuthentikAccessRevoked = 'authentik_access_revoked';
-    case AuthentikAccessRestored = 'authentik_access_restored';
-    case AuthentikSessionEnded = 'authentik_session_ended';
+    case PlatformAccessRevoked = 'platform_access_revoked';
+    case PlatformAccessRestored = 'platform_access_restored';
     case KeyFingerprintRegistered = 'key_fingerprint_registered';
     case KeyRotationStarted = 'key_rotation_started';
     case KeyRotationFinished = 'key_rotation_finished';
@@ -31,15 +30,12 @@ enum SecurityEvent: string
     {
         return match ($this) {
             self::LoginSucceeded => 'Đăng nhập thành công',
-            self::LoginRefused => 'Đăng nhập bị từ chối',
-            self::LoginWithoutMfa => 'Đăng nhập thiếu bằng chứng MFA',
             self::StaffFirstSeen => 'Nhân viên xuất hiện lần đầu',
-            self::RolesChanged => 'Vai trò đổi theo Authentik',
+            self::RolesChanged => 'Vai trò đổi theo platform',
             self::StaffDeactivated => 'Khoá nhân viên',
             self::StaffReactivated => 'Mở khoá nhân viên',
-            self::AuthentikAccessRevoked => 'Mất quyền theo Authentik',
-            self::AuthentikAccessRestored => 'Có lại quyền theo Authentik',
-            self::AuthentikSessionEnded => 'Authentik huỷ phiên kho',
+            self::PlatformAccessRevoked => 'Mất quyền theo platform',
+            self::PlatformAccessRestored => 'Có lại quyền theo platform',
             self::KeyFingerprintRegistered => 'Đăng ký dấu vân tay khoá mã hoá',
             self::KeyRotationStarted => 'Bắt đầu xoay khoá mã hoá',
             self::KeyRotationFinished => 'Xoay xong khoá mã hoá',

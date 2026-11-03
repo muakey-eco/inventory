@@ -1,4 +1,4 @@
-# Panel Filament, API cấp hàng và back-channel logout của Authentik. FrankenPHP
+# Panel Filament, API cấp hàng, back-channel logout và webhook của platform. FrankenPHP
 # chạy CMD mặc định của image, chỉ HTTP ở cổng 8000 (`SERVER_NAME` trong
 # Dockerfile); TLS kết thúc ở ingress-nginx.
 #
@@ -72,9 +72,10 @@ spec:
             limits:
               memory: 1Gi
 ---
-# Cũng là đích back-channel logout của Authentik trong cluster:
-# `http://web.inventory.svc:8000/auth/authentik/backchannel-logout`, không qua
-# ingress (ingress chỉ mở cho mạng nội bộ).
+# Cũng là đích platform gọi trong cluster, không qua ingress (ingress chỉ mở
+# cho mạng nội bộ): back-channel logout
+# `http://web.inventory.svc:8000/admin/auth/backchannel-logout` và webhook
+# `http://web.inventory.svc:8000/admin/auth/webhook` (`platform.yaml`).
 apiVersion: v1
 kind: Service
 metadata:

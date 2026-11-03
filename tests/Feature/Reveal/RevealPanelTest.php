@@ -30,18 +30,16 @@ use App\Models\RevealLogEntry;
 use App\Models\Slot;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Owner);
-    $this->clerk = staffMember(Role::NhapKho);
+    $this->admin = staffMember(Role::Admin);
+    $this->clerk = staffMember(Role::Importer);
     $this->product = productOf(
         StockForm::OneTimeCode,
         [new ContentFieldDraft('code', 'Mã thẻ', dedupeKey: true)],
@@ -62,9 +60,9 @@ it('chỉ Quản trị vào được Nhật ký xem mã', function (Role $role, 
         ->get(RevealLogEntryResource::getUrl('index'))
         ->assertStatus($status);
 })->with([
-    'Quản trị' => [Role::Owner, 200],
-    'Nhập kho' => [Role::NhapKho, 403],
-    'Bán hàng' => [Role::BanHang, 403],
+    'Quản trị' => [Role::Admin, 200],
+    'Nhập kho' => [Role::Importer, 403],
+    'Bán hàng' => [Role::Sale, 403],
 ]);
 
 it('Quản trị xem nội dung Slot Còn hàng ở chi tiết Đơn vị hàng kèm lý do; lịch sử xem hiện ai, khi nào', function () {
@@ -123,8 +121,8 @@ it('Nhập kho và Bán hàng mở chi tiết Đơn vị hàng nhưng không có
 
     expect(RevealLogEntriesRelationManager::canViewForRecord($unit, ViewStockUnit::class))->toBeFalse();
 })->with([
-    'Nhập kho' => [Role::NhapKho],
-    'Bán hàng' => [Role::BanHang],
+    'Nhập kho' => [Role::Importer],
+    'Bán hàng' => [Role::Sale],
 ]);
 
 it('Quản trị không thấy nút xem nội dung trên Slot đã rời Còn hàng', function () {
@@ -143,7 +141,7 @@ it('Quản trị thấy Đã được xem bởi trên trang Phiếu xuất: mọ
     // Lượt xem lúc hàng còn trong kho: Ngữ cảnh không phải Giao hàng nhưng vẫn là đã thấy mã của Slot.
     $reveal->reveal(RevealActor::staff($this->admin), Slot::sole(), RevealContext::inStock(), 'Khách hỏi lại mã');
 
-    $seller = staffMember(Role::BanHang);
+    $seller = staffMember(Role::Sale);
     $channel = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Zalo'));
     $dispatch = app(ManualDispatch::class)->create($seller, new DispatchDraft($channel, 'SP-001', [new DispatchLineDraft($this->product, 1)], 'Anh Minh'));
     $delivery = $dispatch->deliveries()->firstOrFail();
@@ -174,7 +172,7 @@ it('Quản trị thấy Đã được xem bởi trên trang Phiếu xuất: mọ
 
 it('Bán hàng và Nhập kho không thấy Đã được xem bởi trên trang Phiếu xuất', function () {
     app(BatchIntake::class)->confirm($this->clerk, $this->batch);
-    $seller = staffMember(Role::BanHang);
+    $seller = staffMember(Role::Sale);
     $channel = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Zalo'));
     $dispatch = app(ManualDispatch::class)->create($seller, new DispatchDraft($channel, 'SP-001', [new DispatchLineDraft($this->product, 1)], 'Anh Minh'));
     app(ContentReveal::class)->revealDelivery($seller, $dispatch->deliveries()->firstOrFail());

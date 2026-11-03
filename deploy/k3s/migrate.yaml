@@ -2,8 +2,10 @@
 # (`wait-for-migrate.yaml`), nên không cần khoá `migrate --isolated` giữa các
 # pod (ADR 0009).
 #
-# Seed Vai trò chạy theo ngay sau: `RoleSeeder` chạy lại nhiều lần vẫn an toàn,
-# nên lần dựng đầu không còn bước seed tay. `inventory:keys:register` thì KHÔNG
+# Quét bù Bản sao danh bạ chạy theo ngay sau (ADR 0011): scheduler chỉ quét
+# mỗi giờ, còn những gì đổi trên platform trong lúc kho dừng thì phải bù ngay
+# lúc deploy. Lượt quét hỏng (platform sập) không chặn deploy: Vai trò và quyền
+# vào kho không phụ thuộc nó. `inventory:keys:register` thì KHÔNG
 # chạy ở đây: tự đăng ký là `keys:verify` mất tác dụng, khoá sai trên Infisical
 # sẽ được nhận luôn thay vì bị chặn. Nó chạy tay một lần (README).
 #
@@ -41,7 +43,7 @@ spec:
           args:
             - sh
             - -c
-            - php artisan migrate --force && php artisan db:seed --class=RoleSeeder --force
+            - php artisan migrate --force && { php artisan platform:directory-sync || echo 'Quét bù Bản sao danh bạ hỏng, scheduler sẽ quét lại.'; }
           resources:
             requests:
               cpu: 100m

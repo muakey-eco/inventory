@@ -45,19 +45,17 @@ use App\Models\SalesChannel;
 use App\Models\Slot;
 use App\Models\StockLedgerEntry;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Owner);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->seller = staffMember(Role::Sale);
     $this->manual = app(ManualDispatch::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
 
@@ -371,7 +369,7 @@ it('Hạn bảo hành = min(ngày giao + thời hạn bảo hành lúc giao, H�
 it('Bán hàng và Quản trị xuất được, Nhập kho thì không', function () {
     dispatchStock($this->steam, "SR1\tA-1");
     $draft = dispatchOrder($this->zalo, [[$this->steam, 1]]);
-    $clerk = staffMember(Role::NhapKho);
+    $clerk = staffMember(Role::Importer);
 
     expect(fn () => $this->manual->check($clerk, $draft))->toThrow(MissingRole::class)
         ->and(fn () => $this->manual->create($clerk, $draft))->toThrow(MissingRole::class)
@@ -427,7 +425,7 @@ it('chỉ người vừa xuất kho xem được màn kết quả', function () 
 
     expect(fn () => app(ContentReveal::class)->revealDispatchResult($this->admin, $dispatch))
         ->toThrow(InvalidReveal::class, 'Chỉ người vừa xuất kho xem được màn kết quả.')
-        ->and(fn () => app(ContentReveal::class)->revealDispatchResult(staffMember(Role::NhapKho), $dispatch))
+        ->and(fn () => app(ContentReveal::class)->revealDispatchResult(staffMember(Role::Importer), $dispatch))
         ->toThrow(MissingRole::class)
         ->and(RevealLogEntry::count())->toBe(0)
         ->and(app(ContentReveal::class)->revealDispatchResult($this->seller, $dispatch)->slots)->toHaveCount(1);
@@ -565,7 +563,7 @@ it('chỉ người vừa xuất kho Copy tất cả và tải file được, t�
     expect(fn () => $reveal->exportDispatchResult($this->seller, $unrevealed, DispatchResultFormat::Txt))->toThrow(InvalidReveal::class, $closed)
         ->and(fn () => $reveal->copyAllDispatchResult($this->seller, $unrevealed))->toThrow(InvalidReveal::class, $closed)
         ->and(fn () => $reveal->exportDispatchResult($this->admin, $dispatch, DispatchResultFormat::Csv))->toThrow(InvalidReveal::class, 'Chỉ người vừa xuất kho xem được màn kết quả.')
-        ->and(fn () => $reveal->copyAllDispatchResult(staffMember(Role::NhapKho), $dispatch))->toThrow(MissingRole::class);
+        ->and(fn () => $reveal->copyAllDispatchResult(staffMember(Role::Importer), $dispatch))->toThrow(MissingRole::class);
 
     $this->travel(30)->minutes();
 

@@ -66,7 +66,7 @@ class BatchIntake
      */
     public function submit(User $actor, BatchDraft $draft): Batch
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
         self::validateDraft($draft);
         $this->fingerprints->verify();
         self::ensureDedupeKeysSettled();
@@ -138,7 +138,7 @@ class BatchIntake
      */
     public function revise(User $actor, Batch $batch, BatchRevision $revision): Batch
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
         $this->fingerprints->verify();
         self::ensureDedupeKeysSettled();
 
@@ -227,7 +227,7 @@ class BatchIntake
      */
     public function preview(User $actor, Batch $batch): BatchPreview
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         $batch = Batch::query()->with('lines.product')->findOrFail($batch->getKey());
 
@@ -271,7 +271,7 @@ class BatchIntake
      */
     public function confirm(User $actor, Batch $batch, bool $skipStockDuplicates = false): Batch
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
         $this->fingerprints->verify();
         self::ensureDedupeKeysSettled();
 
@@ -378,7 +378,7 @@ class BatchIntake
      */
     public function discard(User $actor, Batch $batch): Batch
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         return DB::transaction(function () use ($batch): Batch {
             $current = Batch::query()->lockForUpdate()->findOrFail($batch->getKey());
@@ -430,7 +430,7 @@ class BatchIntake
      */
     public function downloadableRejectedLines(User $actor, Batch $batch): Collection
     {
-        if (! $this->roles->allows($actor, Role::NhapKho)
+        if (! $this->roles->allows($actor, Role::Importer)
             || (int) $batch->created_by !== (int) $actor->getKey()
             || ! self::isRejectedDownloadOpen($batch)) {
             return new Collection;
@@ -454,7 +454,7 @@ class BatchIntake
      */
     public function rejectedLines(User $actor, BatchLine $line): RejectedLinesExport
     {
-        $this->roles->authorize($actor, Role::NhapKho);
+        $this->roles->authorize($actor, Role::Importer);
 
         return DB::transaction(function () use ($actor, $line): RejectedLinesExport {
             $line = BatchLine::query()->with(['batch', 'product'])->findOrFail($line->getKey());

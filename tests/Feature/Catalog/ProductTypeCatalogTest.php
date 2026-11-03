@@ -14,12 +14,10 @@ use App\Inventory\Catalog\ProductTypeInUse;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Encryption\Normalization;
 use App\Models\ProductType;
-use Database\Seeders\RoleSeeder;
 
 beforeEach(function () {
-    $this->seed(RoleSeeder::class);
     $this->catalog = app(ProductTypeCatalog::class);
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
 });
 
 /**
@@ -65,8 +63,8 @@ it('chỉ Quản trị tạo được Loại sản phẩm', function (Role $role
 
     expect(ProductType::count())->toBe(0);
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);
 
 it('tuỳ chọn chuẩn hoá mặc định theo Dạng hàng', function (StockForm $form, string $raw, string $normalized) {
@@ -375,6 +373,6 @@ it('chỉ Quản trị sửa, Ngừng dùng và xoá được Loại sản phẩ
     expect($type->name)->toBe('Thẻ nạp')
         ->and($type->isDiscontinued())->toBeFalse();
 })->with([
-    'Nhập kho' => Role::NhapKho,
-    'Bán hàng' => Role::BanHang,
+    'Nhập kho' => Role::Importer,
+    'Bán hàng' => Role::Sale,
 ]);

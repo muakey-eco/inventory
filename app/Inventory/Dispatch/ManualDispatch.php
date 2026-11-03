@@ -38,7 +38,7 @@ class ManualDispatch
      */
     public function check(User $actor, DispatchDraft $draft): array
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         return self::problems($draft);
     }
@@ -53,7 +53,7 @@ class ManualDispatch
      */
     public function checkAdditional(User $actor, Dispatch $dispatch, array $lines): array
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         return self::additionalProblems(Dispatch::query()->findOrFail($dispatch->getKey()), $lines);
     }
@@ -69,7 +69,7 @@ class ManualDispatch
      */
     public function shortages(User $actor, array $lines): array
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $lines = array_values(array_filter($lines, fn (DispatchLineDraft $line): bool => $line->product !== null && $line->quantity > 0));
         $available = $this->stock->counts(array_values(array_unique(array_map(fn (DispatchLineDraft $line): int => (int) $line->product?->getKey(), $lines))));
@@ -98,7 +98,7 @@ class ManualDispatch
      */
     public function create(User $actor, DispatchDraft $draft): Dispatch
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
 
         $problems = self::problems($draft);
 
@@ -137,7 +137,7 @@ class ManualDispatch
      */
     public function addLines(User $actor, Dispatch $dispatch, array $lines): Dispatch
     {
-        $this->roles->authorize($actor, Role::BanHang);
+        $this->roles->authorize($actor, Role::Sale);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $dispatch, $lines): Dispatch {
@@ -168,7 +168,7 @@ class ManualDispatch
      */
     public function canAddLines(User $actor, Dispatch $dispatch): bool
     {
-        return $dispatch->status === DispatchStatus::Completed && $this->roles->allows($actor, Role::BanHang);
+        return $dispatch->status === DispatchStatus::Completed && $this->roles->allows($actor, Role::Sale);
     }
 
     /**

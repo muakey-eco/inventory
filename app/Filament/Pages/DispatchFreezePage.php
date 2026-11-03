@@ -73,7 +73,7 @@ class DispatchFreezePage extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return app(RoleGate::class)->allows(InventoryAction::actor(), Role::Owner);
+        return app(RoleGate::class)->allows(InventoryAction::actor(), Role::Admin);
     }
 
     public function mount(): void

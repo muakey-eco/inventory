@@ -18,6 +18,7 @@ Schedule::command('inventory:defect-reports:purge')->hourly();
 // vì hạn Giữ hàng tính bằng phút; giữ lâu hơn cần thì hàng nằm chết trong kho.
 Schedule::command('inventory:dispatches:release-holds')->everyMinute();
 
-// Đối soát nhân viên với Authentik (ADR 0008): người bị tắt hoặc gỡ khỏi group `kho-*` mất quyền
-// trong vòng một phút, kể cả phiên đang mở.
-Schedule::command('inventory:staff:sync')->everyMinute()->withoutOverlapping();
+// Bản sao danh bạ (ADR 0011): quét bù những webhook `user.*` bị lỡ, để nhân viên bị đình chỉ hay
+// bị xoá trên platform hiện **Mất quyền theo platform** ở trang Nhân viên. Job `migrate` chạy
+// thêm một lần mỗi deploy, cho những gì đổi trong lúc kho dừng.
+Schedule::command('platform:directory-sync')->hourly()->withoutOverlapping();

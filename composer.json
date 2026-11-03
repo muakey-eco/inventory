@@ -13,7 +13,7 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "muakey/filament-muakey-theme": "^1.0",
-        "spatie/laravel-permission": "^8"
+        "muakey/platform-laravel": "^0.3"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -99,6 +99,10 @@
         {
             "type": "vcs",
             "url": "https://github.com/muakey-eco/filament-muakey-theme"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/muakey-eco/platform-laravel"
         }
     ]
 }

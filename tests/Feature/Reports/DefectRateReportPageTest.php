@@ -19,18 +19,16 @@ use App\Inventory\Stock\StockDefect;
 use App\Models\StockUnit;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Owner);
-    $this->stocker = staffMember(Role::NhapKho);
-    $this->seller = staffMember(Role::BanHang);
+    $this->admin = staffMember(Role::Admin);
+    $this->stocker = staffMember(Role::Importer);
+    $this->seller = staffMember(Role::Sale);
 
     $this->netflix = productOf(
         StockForm::Account,
@@ -82,9 +80,9 @@ it('chỉ Quản trị và Nhập kho vào được báo cáo Tỉ lệ lỗi', 
 
     $this->get(DefectRateReportPage::getUrl())->assertStatus($sees ? 200 : 403);
 })->with([
-    'Quản trị' => [Role::Owner, true],
-    'Nhập kho' => [Role::NhapKho, true],
-    'Bán hàng' => [Role::BanHang, false],
+    'Quản trị' => [Role::Admin, true],
+    'Nhập kho' => [Role::Importer, true],
+    'Bán hàng' => [Role::Sale, false],
     'không vai trò' => [null, false],
 ]);
 

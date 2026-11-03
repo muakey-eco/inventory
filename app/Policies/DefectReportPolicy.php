@@ -17,12 +17,12 @@ class DefectReportPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::BanHang);
+        return $this->roles->allows($user, Role::Sale);
     }
 
     public function view(User $user, DefectReport $defectReport): bool
     {
-        return $this->roles->allows($user, Role::BanHang);
+        return $this->roles->allows($user, Role::Sale);
     }
 
     public function create(User $user): bool

@@ -18,32 +18,32 @@ class ProductTypePolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     public function view(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::NhapKho, Role::BanHang);
+        return $this->roles->allows($user, Role::Importer, Role::Sale);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function update(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Owner);
+        return $this->roles->allows($user, Role::Admin);
     }
 
     public function discontinue(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Owner) && ! $type->isDiscontinued();
+        return $this->roles->allows($user, Role::Admin) && ! $type->isDiscontinued();
     }
 
     public function delete(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Owner) && $type->products()->doesntExist();
+        return $this->roles->allows($user, Role::Admin) && $type->products()->doesntExist();
     }
 
     public function deleteAny(User $user): bool

@@ -26,17 +26,15 @@ use App\Models\Slot;
 use App\Models\StockLedgerEntry;
 use App\Models\StockUnit;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('intake');
-    $this->seed(RoleSeeder::class);
     app(KeyFingerprints::class)->register();
 
     $this->intake = app(BatchIntake::class);
     $this->reversal = app(ImportReversal::class);
-    $this->admin = staffMember(Role::Owner);
+    $this->admin = staffMember(Role::Admin);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
 
     $this->codes = productOf(
@@ -230,8 +228,8 @@ it('chỉ Quản trị Huỷ nhập được', function (Role $role) {
         ->and(fn () => $this->reversal->reverse($staff, $batch))->toThrow(MissingRole::class)
         ->and(StockUnit::sole()->status)->toBe(StockUnitStatus::Active);
 })->with([
-    'Nhập kho' => [Role::NhapKho],
-    'Bán hàng' => [Role::BanHang],
+    'Nhập kho' => [Role::Importer],
+    'Bán hàng' => [Role::Sale],
 ]);
 
 it('từ chối Huỷ nhập Lô nhập chưa xác nhận hoặc không còn gì để huỷ', function () {

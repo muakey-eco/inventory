@@ -2,14 +2,15 @@
 
 namespace App\Providers;
 
-use App\Http\Responses\SignedOutResponse;
 use App\Inventory\Encryption\KeyFingerprints;
-use App\Listeners\RecordAuthenticationEvents;
-use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
+use App\Inventory\Staff\StaffDirectory;
+use App\Inventory\Staff\StaffResolver;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\WorkerStarting;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Muakey\Platform\Contracts\DirectorySink;
+use Muakey\Platform\Contracts\PlatformUserResolver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,7 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(LogoutResponse::class, SignedOutResponse::class);
+        // Nhân viên sinh ở lần đầu đăng nhập qua platform (ADR 0011).
+        $this->app->bind(PlatformUserResolver::class, StaffResolver::class);
+        // Bật Bản sao danh bạ: webhook `user.*` (khi có PLATFORM_WEBHOOK_SECRET) và lệnh quét bù.
+        $this->app->bind(DirectorySink::class, StaffDirectory::class);
     }
 
     /**
@@ -26,8 +30,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Event::subscribe(RecordAuthenticationEvents::class);
-
         // File nhập hàng upload qua Livewire: giới hạn theo cấu hình nhập hàng, không theo mặc định 12 MB.
         config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:'.intdiv((int) config('inventory.intake.max_bytes'), 1024)]]);
 

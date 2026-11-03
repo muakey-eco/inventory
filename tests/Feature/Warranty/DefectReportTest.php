@@ -1,7 +1,7 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -50,8 +50,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->reports = app(DefectReporting::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee', requiresExternalRef: true));
@@ -142,14 +142,14 @@ it('ngoài Hạn bảo hành hoặc thời hạn bảo hành 0 thì Bán hàng k
     expect($this->reports->canReport($this->seller, $code))->toBeTrue()
         ->and($this->reports->canReport($this->seller, $gift))->toBeFalse()
         ->and(fn () => $this->reports->report($this->seller, [$gift], $draft))
-        ->toThrow(InvalidDefectReport::class, "Lần giao {$gift->unitLabel()}: Sản phẩm không có bảo hành; chỉ Quản trị tạo Báo lỗi được, kèm lý do.");
+        ->toThrow(InvalidDefectReport::class, "Lần giao {$gift->unitLabel()}: Sản phẩm không có bảo hành; chỉ người có Quyền Vượt hạn tạo Báo lỗi được, kèm lý do.");
 
     $this->travel(1)->days();
 
     expect($this->reports->canReport($this->seller, $code))->toBeFalse()
         ->and($this->reports->canReport($this->admin, $code))->toBeTrue()
         ->and(fn () => $this->reports->report($this->seller, [$code], $draft))
-        ->toThrow(InvalidDefectReport::class, "Lần giao {$code->unitLabel()}: đã quá Hạn bảo hành 22/09/2026; chỉ Quản trị tạo Báo lỗi được, kèm lý do.")
+        ->toThrow(InvalidDefectReport::class, "Lần giao {$code->unitLabel()}: đã quá Hạn bảo hành 22/09/2026; chỉ người có Quyền Vượt hạn tạo Báo lỗi được, kèm lý do.")
         ->and(fn () => $this->reports->report($this->admin, [$code, $gift], $draft))
         ->toThrow(InvalidDefectReport::class, 'Báo lỗi ngoài Hạn bảo hành phải nhập lý do.')
         ->and(DefectReport::count())->toBe(0);
@@ -157,6 +157,24 @@ it('ngoài Hạn bảo hành hoặc thời hạn bảo hành 0 thì Bán hàng k
     $created = $this->reports->report($this->admin, [$code, $gift], new DefectReportDraft('Mã lỗi', overrideReason: '  Khách quen  '));
 
     expect(collect($created)->map(fn (DefectReport $report) => $report->warranty_override_reason)->all())->toBe(['Khách quen', 'Khách quen']);
+});
+
+it('ngoài Hạn bảo hành chỉ người có cả Báo lỗi và Vượt hạn tạo được Báo lỗi; xem mã lần giao cần Xuất hàng, ngoài hạn thêm Vượt hạn', function () {
+    defectStock($this->steam, "SR1\tA-1");
+    [$code] = defectDeliveries(defectOrder('SP-001', [$this->steam->id => 1]));
+    $reveal = app(ContentReveal::class);
+    $this->travel(8)->days();
+
+    expect($this->reports->canReport(staffMember(Permission::DefectReport), $code))->toBeFalse()
+        ->and($this->reports->canReport(staffMember(Permission::DeadlineOverride), $code))->toBeFalse()
+        ->and($this->reports->canReport(staffMember(Permission::DefectReport, Permission::DeadlineOverride), $code))->toBeTrue()
+        ->and($reveal->canRevealDelivery(staffMember(Permission::Dispatch), $code))->toBeFalse()
+        ->and($reveal->canRevealDelivery(staffMember(Permission::DeadlineOverride), $code))->toBeFalse()
+        ->and($reveal->canRevealDelivery(staffMember(Permission::Dispatch, Permission::DeadlineOverride), $code))->toBeTrue();
+
+    $created = $this->reports->report(staffMember(Permission::DefectReport, Permission::DeadlineOverride), [$code], new DefectReportDraft('Mã lỗi', overrideReason: 'Khách quen'));
+
+    expect($created[0]->warranty_override_reason)->toBe('Khách quen');
 });
 
 it('Báo lỗi trong Hạn bảo hành không lưu lý do vượt', function () {
@@ -189,7 +207,7 @@ it('Báo lỗi không tạo được và không đổi gì', function (Closure $
 
         return [test()->seller, new DefectReportDraft('Lỗi'), "Lần giao {$first->unitLabel()}: Slot không còn Đã giao; không Báo lỗi được."];
     }, InvalidDefectReport::class],
-    'Nhập kho' => [fn () => [staffMember(Role::Importer), new DefectReportDraft('Lỗi'), ''], MissingRole::class],
+    'Nhập kho' => [fn () => [staffInRole('importer'), new DefectReportDraft('Lỗi'), ''], MissingPermission::class],
 ]);
 
 it('trong lúc Chờ xác minh, Slot Còn hàng của cùng Đơn vị hàng không thuộc Tồn bán được và không được chọn khi xuất; Bác bỏ thì mở bán lại', function () {
@@ -280,7 +298,7 @@ it('xác minh không được và không đổi gì', function (Closure $arrange
 
         return [fn () => test()->reports->confirm(test()->seller, $report, DefectScope::Unit, 'Lỗi thật'), 'Đơn vị hàng đang Đã huỷ; chỉ Xác nhận được Phạm vi lỗi Chỉ Slot.'];
     }, InvalidDefectReport::class],
-    'Nhập kho' => [fn (DefectReport $report) => [fn () => test()->reports->reject(staffMember(Role::Importer), $report, 'Không lỗi'), ''], MissingRole::class],
+    'Nhập kho' => [fn (DefectReport $report) => [fn () => test()->reports->reject(staffInRole('importer'), $report, 'Không lỗi'), ''], MissingPermission::class],
 ]);
 
 it('tạo lại Báo lỗi sau Bác bỏ được; hiện lịch sử các lần Bác bỏ của Slot', function () {
@@ -324,7 +342,7 @@ it('xác minh xem mã ghi Nhật ký xem mã ngữ cảnh Báo lỗi; chỉ khi 
 
     expect($reveal->canRevealDefectReport($this->seller, $report->fresh()))->toBeFalse()
         ->and(fn () => $reveal->revealDefectReport($this->seller, $report))->toThrow(InvalidReveal::class, 'Chỉ xem mã để xác minh Báo lỗi Chờ xác minh.')
-        ->and(fn () => $reveal->revealDefectReport(staffMember(Role::Importer), $report))->toThrow(MissingRole::class)
+        ->and(fn () => $reveal->revealDefectReport(staffInRole('importer'), $report))->toThrow(MissingPermission::class)
         ->and(RevealLogEntry::count())->toBe(1);
 });
 
@@ -373,7 +391,7 @@ it('Báo lỗi hàng loạt theo cùng quy tắc Hạn bảo hành; chỉ từ B
     $this->reports->confirm($this->seller, $report, DefectScope::Unit, 'Bị khoá thật');
 
     expect(fn () => $this->reports->confirmAffected($this->seller, $report, [$old]))
-        ->toThrow(InvalidDefectReport::class, "Lần giao {$old->unitLabel()}: đã quá Hạn bảo hành 15/10/2026; chỉ Quản trị tạo Báo lỗi được, kèm lý do.")
+        ->toThrow(InvalidDefectReport::class, "Lần giao {$old->unitLabel()}: đã quá Hạn bảo hành 15/10/2026; chỉ người có Quyền Vượt hạn tạo Báo lỗi được, kèm lý do.")
         ->and($this->reports->confirmAffected($this->admin, $report, [$old], overrideReason: 'Khách VIP'))->sequence(
             fn ($bulk) => $bulk->warranty_override_reason->toBe('Khách VIP'),
         );

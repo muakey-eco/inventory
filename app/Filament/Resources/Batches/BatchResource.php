@@ -62,7 +62,7 @@ use UnitEnum;
 /**
  * Lô nhập trong panel. Adapter mỏng: trang tạo gọi BatchIntake::submit, trang xem hiện
  * BatchIntake::preview, nút xác nhận gọi BatchIntake::confirm và nút bỏ gọi BatchIntake::discard.
- * Bán hàng không thấy.
+ * Cần Quyền Nhập hàng.
  */
 class BatchResource extends Resource
 {
@@ -538,9 +538,9 @@ class BatchResource extends Resource
         $bo = $record->rejectedInvalidCount() + $record->rejectedDuplicateCount();
 
         return $bo === 0
-            ? sprintf('Tổng Giá vốn %s. Không dòng nào bị bỏ. Xác nhận là Lô nhập đóng lại, chỉ Quản trị Huỷ nhập được.', $money(self::preview($record)->totalCost()))
+            ? sprintf('Tổng Giá vốn %s. Không dòng nào bị bỏ. Xác nhận là Lô nhập đóng lại, sau đó chỉ còn Huỷ nhập, cần Quyền Huỷ nhập.', $money(self::preview($record)->totalCost()))
             : sprintf(
-                'Tổng Giá vốn %s. %s dòng bị bỏ và KHÔNG vào kho. Xác nhận là Lô nhập đóng lại, chỉ Quản trị Huỷ nhập được.',
+                'Tổng Giá vốn %s. %s dòng bị bỏ và KHÔNG vào kho. Xác nhận là Lô nhập đóng lại, sau đó chỉ còn Huỷ nhập, cần Quyền Huỷ nhập.',
                 $money(self::preview($record)->totalCost()),
                 number_format($bo, 0, ',', '.'),
             );

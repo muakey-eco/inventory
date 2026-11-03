@@ -15,8 +15,8 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Icons\Heroicon;
 
 /**
- * Chi tiết Đơn vị hàng. Quản trị Huỷ hàng cả Đơn vị hàng (StockVoid), Đánh dấu Lỗi hoặc Khôi phục
- * (StockDefect) qua modal.
+ * Chi tiết Đơn vị hàng. Huỷ hàng cả Đơn vị hàng (StockVoid), Đánh dấu Lỗi hoặc Khôi phục
+ * (StockDefect) qua modal, mỗi việc theo Quyền của nó.
  */
 class ViewStockUnit extends ViewRecord
 {

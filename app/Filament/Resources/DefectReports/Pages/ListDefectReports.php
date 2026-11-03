@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Danh sách Báo lỗi; tab tồn đọng là Báo lỗi Chờ xác minh quá số giờ cấu hình, tab Chờ đổi là Báo lỗi
- * Xác nhận chưa Đổi hàng hay Không đổi, tab Chờ Quản trị duyệt là Đổi hàng từ lần thứ 3 đã được yêu
+ * Xác nhận chưa Đổi hàng hay Không đổi, tab Chờ duyệt là Đổi hàng từ lần thứ 3 đã được yêu
  * cầu duyệt.
  */
 class ListDefectReports extends ListRecords
@@ -37,7 +37,7 @@ class ListDefectReports extends ListRecords
                 ->badge(fn (): int => DefectReport::query()->awaitingReplacement()->count())
                 ->badgeColor('warning')
                 ->modifyQueryUsing(fn ($query) => $query->awaitingReplacement()),
-            'approval' => Tab::make('Chờ Quản trị duyệt')
+            'approval' => Tab::make('Chờ duyệt')
                 ->badge(fn (): int => DefectReport::query()->awaitingApproval()->count())
                 ->badgeColor('danger')
                 ->modifyQueryUsing(fn ($query) => $query->awaitingApproval()),

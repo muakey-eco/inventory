@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Dispatch;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Encryption\DedupeHashesStale;
 use App\Inventory\Encryption\DedupeLookup;
 use App\Inventory\Encryption\KeyFingerprintMismatch;
@@ -23,7 +24,7 @@ use Illuminate\Support\Facades\DB;
 use SensitiveParameter;
 
 /**
- * Ghi nhận giao bù: Quản trị ghi lại một lần Giao hàng đã thực sự xảy ra nhưng bị mất khỏi kho do
+ * Ghi nhận giao bù: người có Quyền Tạm dừng xuất kho ghi lại một lần Giao hàng đã thực sự xảy ra nhưng bị mất khỏi kho do
  * khôi phục từ backup. Slot được chọn **đích danh** qua Khoá chống trùng khách đang giữ chứ không
  * theo Thứ tự xuất — ngoại lệ duy nhất, vì phải đúng cái mã khách đã nhận, không phải một cái bất kỳ.
  *
@@ -33,7 +34,7 @@ use SensitiveParameter;
 class RecordedLostDelivery
 {
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private KeyFingerprints $fingerprints,
         private DedupeLookup $dedupe,
         private StockLedger $ledger,
@@ -41,18 +42,18 @@ class RecordedLostDelivery
     ) {}
 
     /**
-     * Các Slot Còn hàng khớp Khoá chống trùng, để Quản trị chọn đúng cái đã giao. Chỉ dạng che, nên
+     * Các Slot Còn hàng khớp Khoá chống trùng, để nhân viên chọn đúng cái đã giao. Chỉ dạng che, nên
      * bước chọn này không phải một lần xem mã và không ghi Nhật ký xem mã.
      *
      * @return list<RecordedSlot>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws KeyFingerprintMismatch
      * @throws DedupeHashesStale đang xoay khoá mã hoá HMAC nên hash chưa tính lại xong
      */
     public function candidates(User $actor, #[SensitiveParameter] string $dedupeKey): array
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::DispatchFreeze);
         // Sai khoá HMAC thì mọi hash lệch và tra cứu âm thầm không thấy gì: báo lỗi thay vì trả rỗng.
         $this->fingerprints->verify();
 
@@ -90,13 +91,13 @@ class RecordedLostDelivery
      *
      * @return Delivery lần giao vừa ghi
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDispatch
      * @throws KeyFingerprintMismatch
      */
     public function record(User $actor, RecordedDeliveryDraft $draft): Delivery
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::DispatchFreeze);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $draft): Delivery {
@@ -157,7 +158,7 @@ class RecordedLostDelivery
      */
     public function canRecord(User $actor): bool
     {
-        return $this->roles->allows($actor);
+        return $this->gate->allows($actor, Permission::DispatchFreeze);
     }
 
     /**
@@ -216,7 +217,7 @@ class RecordedLostDelivery
     }
 
     /**
-     * Dòng xuất loại Ghi nhận giao bù: một Slot, có Giá bán nếu Quản trị biết đơn cũ thu bao nhiêu.
+     * Dòng xuất loại Ghi nhận giao bù: một Slot, có Giá bán nếu nhân viên biết đơn cũ thu bao nhiêu.
      */
     private static function insertRecordedLine(Dispatch $dispatch, int $productId, ?int $salePrice): int
     {

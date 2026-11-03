@@ -1,8 +1,7 @@
 <?php
 
 use App\Filament\Pages\DispatchFreezePage;
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -40,8 +39,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-17 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->exposure = app(ContentExposure::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee'));
@@ -155,7 +154,7 @@ it('bỏ lại Đơn vị hàng đang có Slot Đã giữ cho một Phiếu xu�
 it('chỉ Quản trị, phải nhập lý do, và làm được khi kho đang tạm dừng', function () {
     app(DispatchFreeze::class)->freeze($this->admin, 'Nghi lộ nội dung');
 
-    expect(fn () => $this->exposure->voidExposed($this->seller, $this->netflix, 'Lộ'))->toThrow(MissingRole::class)
+    expect(fn () => $this->exposure->voidExposed($this->seller, $this->netflix, 'Lộ'))->toThrow(MissingPermission::class)
         ->and(fn () => $this->exposure->voidExposed($this->admin, $this->netflix, '   '))->toThrow(InvalidVoid::class, 'phải nhập lý do')
         ->and(StockUnit::query()->where('status', StockUnitStatus::Voided)->count())->toBe(0);
 

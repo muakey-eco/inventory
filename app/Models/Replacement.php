@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Đổi hàng: lần giao mới thay cho Slot có Báo lỗi đã Xác nhận. Chỉ tạo qua {@see ReplacementDelivery}.
- * Giá vốn và Nhà cung cấp là dữ liệu thương mại: Bán hàng không được thấy.
+ * Giá vốn và Nhà cung cấp là dữ liệu thương mại: chỉ người có Quyền Xem giá vốn và Nhà cung cấp thấy.
  *
  * @property int $id
  * @property int $defect_report_id
@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $defective_product_id Sản phẩm của Đơn vị hàng lỗi
  * @property int $supplier_id Nhà cung cấp của Đơn vị hàng lỗi
  * @property int $created_by
- * @property ?int $approved_by Quản trị duyệt (hoặc tự làm) lần đổi từ thứ 3 của chuỗi
+ * @property ?int $approved_by người có Quyền Duyệt Đổi hàng duyệt (hoặc tự làm) lần đổi từ thứ 3 của chuỗi
  * @property ?CarbonImmutable $result_revealed_at
  * @property CarbonImmutable $created_at
  * @property-read DefectReport $defectReport

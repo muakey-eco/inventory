@@ -8,7 +8,6 @@ use App\Filament\Resources\Dispatches\Pages\ViewDispatch;
 use App\Filament\Resources\Dispatches\Widgets\DispatchDeliveries;
 use App\Filament\Resources\SalesChannels\Pages\ManageSalesChannels;
 use App\Filament\Resources\SalesChannels\SalesChannelResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Catalog\SupplierDirectory;
@@ -46,8 +45,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee', requiresExternalRef: true));
     $this->zalo = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Zalo'));
     $this->steam = productOf(
@@ -65,16 +64,16 @@ beforeEach(function () {
     )));
 });
 
-it('Quản trị và Bán hàng vào được Phiếu xuất, Nhập kho thì không; chỉ Quản trị vào Kênh bán', function (Role $role, int $dispatches, int $channels) {
-    $this->actingAs(staffMember($role));
+it('Quản trị và Bán hàng vào được Phiếu xuất, Nhập kho thì không; chỉ Quản trị vào Kênh bán', function (string $role, int $dispatches, int $channels) {
+    $this->actingAs(staffInRole($role));
 
     $this->get(DispatchResource::getUrl('index'))->assertStatus($dispatches);
     $this->get(DispatchResource::getUrl('create'))->assertStatus($dispatches);
     $this->get(SalesChannelResource::getUrl('index'))->assertStatus($channels);
 })->with([
-    'Quản trị' => [Role::Admin, 200, 200],
-    'Bán hàng' => [Role::Sale, 200, 403],
-    'Nhập kho' => [Role::Importer, 403, 403],
+    'Quản trị' => ['admin', 200, 200],
+    'Bán hàng' => ['sale', 200, 403],
+    'Nhập kho' => ['importer', 403, 403],
 ]);
 
 it('form xuất kho hiện Tồn lỗi riêng cạnh Tồn bán được', function () {
@@ -265,7 +264,7 @@ it('trang xem phiếu: Dòng xuất có Loại, Lần giao dạng che; Bán hàn
     Livewire::test(DispatchDeliveries::class, ['record' => $dispatch])
         ->assertActionVisible(TestAction::make('reveal')->table($delivery));
 
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
 
     $this->get(DispatchResource::getUrl('view', ['record' => $dispatch]))->assertForbidden();
 });
@@ -458,7 +457,7 @@ it('Giao thêm thiếu hàng thì modal báo thiếu và không thêm gì; phi�
 
     expect(DispatchLine::count())->toBe(1);
 
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     $this->get($url)->assertForbidden();
 
     DB::table('dispatches')->where('id', $dispatch->id)->update(['status' => DispatchStatus::Cancelled->value]);

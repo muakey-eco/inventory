@@ -2,41 +2,41 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\Supplier;
 use App\Models\User;
 
 /**
- * Nhà cung cấp: Quản trị và Nhập kho quản lý; Bán hàng không thấy.
+ * Nhà cung cấp: chỉ người có Quyền Quản lý Nhà cung cấp thấy và quản lý.
  */
 class SupplierPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierManage);
     }
 
     public function view(User $user, Supplier $supplier): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierManage);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierManage);
     }
 
     public function update(User $user, Supplier $supplier): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierManage);
     }
 
     public function delete(User $user, Supplier $supplier): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierManage);
     }
 
     public function deleteAny(User $user): bool

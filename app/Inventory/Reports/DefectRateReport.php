@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Reports;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Intake\BatchStatus;
 use App\Inventory\Stock\StockUnitStatus;
 use App\Models\User;
@@ -30,15 +30,15 @@ use stdClass;
  * Cột 'Lỗi trong kho' tách riêng phần tử số chưa giao Slot nào. Chỉ 'Dòng lỗi/trùng khi nhập' đứng
  * ngoài cả tử số lẫn mẫu số: đó là chất lượng file Nhà cung cấp gửi, các dòng ấy chưa từng thành hàng.
  *
- * Chỉ Quản trị và Nhập kho. Xem hay xuất báo cáo không ghi nhật ký.
+ * Cần Quyền Xem giá vốn và Nhà cung cấp. Xem hay xuất báo cáo không ghi nhật ký.
  */
 class DefectRateReport
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::CostView);
     }
 
     /**
@@ -47,11 +47,11 @@ class DefectRateReport
      *
      * @return list<DefectRateReportRow>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rows(User $actor, DefectRateReportFilter $filter): array
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::CostView);
 
         $rows = [];
 
@@ -64,7 +64,7 @@ class DefectRateReport
     }
 
     /**
-     * Cột báo cáo: khoá → tiêu đề. Cả hai Vai trò xem được thấy như nhau.
+     * Cột báo cáo: khoá → tiêu đề. Ai xem được cũng thấy như nhau.
      *
      * @return array<string, string>
      */
@@ -86,7 +86,7 @@ class DefectRateReport
     /**
      * File báo cáo, gồm cả dòng tổng của từng Nhà cung cấp. Không ghi nhật ký.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function export(User $actor, DefectRateReportFilter $filter, ReportFormat $format): ReportExport
     {

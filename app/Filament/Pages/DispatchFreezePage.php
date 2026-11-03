@@ -5,8 +5,8 @@ namespace App\Filament\Pages;
 use App\Filament\Resources\Dispatches\DispatchResource;
 use App\Filament\Support\InventoryAction;
 use App\Filament\Support\NavGroup;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Inventory\Dispatch\DispatchFreeze;
@@ -46,7 +46,7 @@ use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 /**
- * Trang sự cố kho của Quản trị, gom ba việc phải làm được **trong lúc** kho đang dừng: bật/tắt Tạm
+ * Trang sự cố kho của người có Quyền Tạm dừng xuất kho, gom ba việc phải làm được **trong lúc** kho đang dừng: bật/tắt Tạm
  * dừng xuất kho, Ghi nhận giao bù các lần giao mất khi khôi phục từ backup, và xử lý hàng bị coi là
  * đã lộ (Huỷ hàng hàng loạt theo Sản phẩm, cùng danh sách Lần giao bị ảnh hưởng để liên hệ khách).
  *
@@ -73,7 +73,7 @@ class DispatchFreezePage extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return app(RoleGate::class)->allows(InventoryAction::actor(), Role::Admin);
+        return app(PermissionGate::class)->allows(InventoryAction::actor(), Permission::DispatchFreeze);
     }
 
     public function mount(): void
@@ -130,7 +130,7 @@ class DispatchFreezePage extends Page implements HasTable
                 ->icon(Heroicon::OutlinedNoSymbol)
                 ->color('danger')
                 ->modalHeading('Bật Tạm dừng xuất kho')
-                ->modalDescription('Toàn kho ngừng Giữ hàng và Giao hàng cho tới khi Quản trị tắt. Các lần giao đang chạy dở vẫn chạy nốt. Ghi Nhật ký bảo mật.')
+                ->modalDescription('Toàn kho ngừng Giữ hàng và Giao hàng cho tới khi có người tắt. Các lần giao đang chạy dở vẫn chạy nốt. Ghi Nhật ký bảo mật.')
                 ->modalSubmitActionLabel('Bật')
                 ->schema(self::reasonSchema('Vì sao dừng kho'))
                 ->visible(fn (DispatchFreeze $freeze): bool => ! $freeze->state()->isFrozen())
@@ -379,7 +379,7 @@ class DispatchFreezePage extends Page implements HasTable
     }
 
     /**
-     * Xem trước số lượng sẽ huỷ, để Quản trị biết mình sắp đụng vào bao nhiêu hàng — nhất là ở phạm
+     * Xem trước số lượng sẽ huỷ, để nhân viên biết mình sắp đụng vào bao nhiêu hàng — nhất là ở phạm
      * vi cả kho, nơi con số là toàn bộ hàng còn bán được.
      */
     private static function planLabel(mixed $scope, mixed $productId, ContentExposure $exposure): string

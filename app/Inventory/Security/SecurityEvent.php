@@ -12,7 +12,7 @@ enum SecurityEvent: string
 {
     case LoginSucceeded = 'login_succeeded';
     case StaffFirstSeen = 'staff_first_seen';
-    case RolesChanged = 'roles_changed';
+    case PermissionsChanged = 'permissions_changed';
     case StaffDeactivated = 'staff_deactivated';
     case StaffReactivated = 'staff_reactivated';
     case PlatformAccessRevoked = 'platform_access_revoked';
@@ -31,7 +31,7 @@ enum SecurityEvent: string
         return match ($this) {
             self::LoginSucceeded => 'Đăng nhập thành công',
             self::StaffFirstSeen => 'Nhân viên xuất hiện lần đầu',
-            self::RolesChanged => 'Vai trò đổi theo platform',
+            self::PermissionsChanged => 'Quyền đổi theo platform',
             self::StaffDeactivated => 'Khoá nhân viên',
             self::StaffReactivated => 'Mở khoá nhân viên',
             self::PlatformAccessRevoked => 'Mất quyền theo platform',

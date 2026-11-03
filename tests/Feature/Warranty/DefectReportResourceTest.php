@@ -6,7 +6,6 @@ use App\Filament\Resources\DefectReports\Pages\ViewDefectReport;
 use App\Filament\Resources\Dispatches\Widgets\DispatchDeliveries;
 use App\Filament\Resources\StockUnits\Pages\ViewStockUnit;
 use App\Filament\Resources\StockUnits\StockUnitResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -50,8 +49,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee', requiresExternalRef: true));
     $this->netflix = productOf(
         StockForm::Account,
@@ -235,7 +234,7 @@ it('danh sách Báo lỗi có tab Chờ xác minh quá 24 giờ; Bán hàng và 
     $this->get(DefectReportResource::getUrl('index'))->assertOk();
     $this->get(DefectReportResource::getUrl('view', ['record' => $overdue[0]]))->assertOk();
 
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
 
     $this->get(DefectReportResource::getUrl('index'))->assertForbidden();
 });
@@ -260,7 +259,7 @@ it('Đơn vị hàng Lỗi hiện Lần giao bị ảnh hưởng ở chi tiết 
     Livewire::test(ViewDefectReport::class, ['record' => $report->getRouteKey()])
         ->assertSeeHtml(StockUnitResource::getUrl('view', $unit));
 
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
 
     Livewire::test(ViewStockUnit::class, $unit)->assertDontSee(['Lần giao bị ảnh hưởng', 'Chị Lan']);
 });
@@ -377,7 +376,7 @@ it('Không đổi ở trang Báo lỗi bắt buộc lý do; đã hoàn tiền th
         ->assertCanNotSeeTableRecords([$refund]);
 });
 
-it('lần đổi thứ 3: Bán hàng thấy cảnh báo và yêu cầu Quản trị duyệt; Quản trị duyệt từ tab Chờ Quản trị duyệt; sau đó Bán hàng Đổi hàng được', function () {
+it('lần đổi thứ 3: Bán hàng thấy cảnh báo và yêu cầu Quản trị duyệt; Quản trị duyệt từ tab Chờ duyệt; sau đó Bán hàng Đổi hàng được', function () {
     panelStock($this->netflix, "b@shop.test\tpw-b\nc@shop.test\tpw-c\nd@shop.test\tpw-d");
     $reports = app(DefectReporting::class);
     $replacements = app(ReplacementDelivery::class);
@@ -396,11 +395,11 @@ it('lần đổi thứ 3: Bán hàng thấy cảnh báo và yêu cầu Quản tr
     Livewire::test(ViewDefectReport::class, ['record' => $third->getRouteKey()])
         ->assertActionHidden('approveReplacement')
         ->mountAction('replace')
-        ->assertMountedActionModalSee(['Lần đổi thứ 3 trong chuỗi', 'từ lần đổi thứ 3 cần Quản trị duyệt']);
+        ->assertMountedActionModalSee(['Lần đổi thứ 3 trong chuỗi', 'từ lần đổi thứ 3 cần người có Quyền Duyệt Đổi hàng duyệt']);
 
     Livewire::test(ViewDefectReport::class, ['record' => $third->getRouteKey()])
         ->callAction('requestReplacementApproval')
-        ->assertNotified('Đã yêu cầu Quản trị duyệt Đổi hàng.')
+        ->assertNotified('Đã xin duyệt Đổi hàng.')
         ->assertActionHidden('requestReplacementApproval');
 
     $this->actingAs($this->admin);
@@ -421,7 +420,7 @@ it('lần đổi thứ 3: Bán hàng thấy cảnh báo và yêu cầu Quản tr
 
     Livewire::test(ViewDefectReport::class, ['record' => $third->getRouteKey()])
         ->mountAction('replace')
-        ->assertMountedActionModalSee('Quản trị đã duyệt lần đổi này')
+        ->assertMountedActionModalSee('Lần đổi này đã được duyệt')
         ->callMountedAction()
         ->assertHasNoActionErrors()
         ->assertActionMounted('revealedContent')

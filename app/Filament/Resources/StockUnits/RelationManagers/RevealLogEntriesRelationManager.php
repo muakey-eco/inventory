@@ -10,7 +10,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Nội dung Đơn vị hàng đã được xem bởi ai, khi nào. Chỉ Quản trị thấy.
+ * Nội dung Đơn vị hàng đã được xem bởi ai, khi nào. Chỉ người có Quyền Xem nhật ký thấy.
  */
 class RevealLogEntriesRelationManager extends RelationManager
 {

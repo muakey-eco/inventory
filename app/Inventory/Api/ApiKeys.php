@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Api;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\SalesChannelType;
 use App\Inventory\Security\SecurityEvent;
 use App\Inventory\Security\SecurityLog;
@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 use SensitiveParameter;
 
 /**
- * Khoá API của các Kênh bán loại API: chỉ Quản trị tạo, xoay và thu hồi, và mỗi thao tác ghi
+ * Khoá API của các Kênh bán loại API: chỉ người có Quyền Quản lý Khoá API tạo, xoay và thu hồi, và mỗi thao tác ghi
  * Nhật ký bảo mật không kèm giá trị khoá. Bí mật chỉ hiện một lần lúc tạo; kho lưu SHA-256 của
  * nó, đủ nhanh để tra mỗi request và không dựng lại được giá trị gốc (bí mật là 48 ký tự ngẫu
  * nhiên nên không sợ dò từ điển như mật khẩu).
@@ -33,31 +33,31 @@ class ApiKeys
 
     private const PREFIX_LENGTH = 8;
 
-    public function __construct(private RoleGate $roles, private SecurityLog $log) {}
+    public function __construct(private PermissionGate $gate, private SecurityLog $log) {}
 
     /**
      * Khoá mới cho một Kênh bán loại API. Giá trị khoá trong kết quả là lần duy nhất kho đọc được nó.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidApiKey
      */
     public function issue(User $actor, SalesChannel $channel, ?string $label = null): IssuedApiKey
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::ApiKeyManage);
 
         return $this->add($actor, $channel, $label, null, SecurityEvent::ApiKeyCreated);
     }
 
     /**
-     * Xoay khoá: cấp khoá mới bên cạnh khoá cũ. Hai khoá cùng hoạt động cho tới khi Quản trị thu hồi
+     * Xoay khoá: cấp khoá mới bên cạnh khoá cũ. Hai khoá cùng hoạt động cho tới khi có người thu hồi
      * khoá cũ, để website đổi khoá xong mới cắt.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidApiKey
      */
     public function rotate(User $actor, ApiKey $key, ?string $label = null): IssuedApiKey
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::ApiKeyManage);
 
         if ($key->isRevoked()) {
             throw new InvalidApiKey('Khoá API đã thu hồi.');
@@ -70,12 +70,12 @@ class ApiKeys
      * Thu hồi: khoá hết gọi vào kho được ngay. Bản ghi ở lại vì Nhật ký xem mã và Phiếu xuất
      * tham chiếu tới nó.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidApiKey
      */
     public function revoke(User $actor, ApiKey $key): ApiKey
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::ApiKeyManage);
 
         return DB::transaction(function () use ($actor, $key): ApiKey {
             $current = ApiKey::query()->lockForUpdate()->findOrFail($key->getKey());
@@ -93,7 +93,7 @@ class ApiKeys
 
     /**
      * Khoá API đứng sau một bí mật website gửi tới, hoặc null khi khoá sai, đã thu hồi, hay Kênh bán
-     * đã ngừng dùng. Ghi lại lần dùng gần nhất để Quản trị thấy khoá nào còn sống.
+     * đã ngừng dùng. Ghi lại lần dùng gần nhất để người quản Khoá API thấy khoá nào còn sống.
      */
     public function authenticate(#[SensitiveParameter] string $secret): ?ApiKey
     {
@@ -107,7 +107,7 @@ class ApiKeys
             return null;
         }
 
-        // Ghi thưa: Quản trị chỉ cần biết khoá còn sống hay không, nên không đáng một UPDATE mỗi request.
+        // Ghi thưa: người quản Khoá API chỉ cần biết khoá còn sống hay không, nên không đáng một UPDATE mỗi request.
         if ($key->last_used_at === null || $key->last_used_at->addMinute()->isPast()) {
             $key->forceFill(['last_used_at' => now()])->save();
         }
@@ -138,7 +138,7 @@ class ApiKeys
         $secret = Str::random(self::SECRET_LENGTH);
 
         return DB::transaction(function () use ($actor, $channel, $label, $rotates, $event, $secret): IssuedApiKey {
-            // Khoá hàng Kênh bán: hai Quản trị cùng tạo khoá không vượt được giới hạn khoá hoạt động.
+            // Khoá hàng Kênh bán: hai người cùng tạo khoá không vượt được giới hạn khoá hoạt động.
             $current = SalesChannel::query()->lockForUpdate()->findOrFail($channel->getKey());
 
             if ($current->type !== SalesChannelType::Api) {

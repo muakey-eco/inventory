@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -42,9 +41,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
-    $this->otherSeller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
+    $this->otherSeller = staffInRole('sale');
     $this->manual = app(ManualDispatch::class);
     $this->reveal = app(ContentReveal::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -124,7 +123,7 @@ it('Xem mã lần giao quá Hạn bảo hành chỉ Quản trị; Nhập kho kh�
     completedDispatch([[$this->steam, 1]]);
     $delivery = Delivery::sole();
 
-    expect(fn () => $this->reveal->revealDelivery(staffMember(Role::Importer), $delivery))->toThrow(MissingRole::class);
+    expect(fn () => $this->reveal->revealDelivery(staffInRole('importer'), $delivery))->toThrow(MissingPermission::class);
 
     $this->travelTo(CarbonImmutable::parse('2026-09-22 23:59'));
 
@@ -135,7 +134,7 @@ it('Xem mã lần giao quá Hạn bảo hành chỉ Quản trị; Nhập kho kh�
 
     expect($this->reveal->canRevealDelivery($this->seller, $delivery))->toBeFalse()
         ->and(fn () => $this->reveal->revealDelivery($this->seller, $delivery))
-        ->toThrow(InvalidReveal::class, 'Lần giao đã quá Hạn bảo hành 22/09/2026; chỉ Quản trị xem được mã.')
+        ->toThrow(InvalidReveal::class, 'Lần giao đã quá Hạn bảo hành 22/09/2026; chỉ người có Quyền Vượt hạn xem được mã.')
         ->and($this->reveal->canRevealDelivery($this->admin, $delivery))->toBeTrue()
         ->and($this->reveal->revealDelivery($this->admin, $delivery)->fields)->toHaveKey('Mã thẻ')
         ->and(RevealLogEntry::count())->toBe(2);
@@ -213,14 +212,14 @@ it('sửa phiếu vẫn kiểm tra mã đơn ngoài trùng trong Kênh bán, kh�
     ])
         ->and(fn () => $editor->edit($this->seller, $dispatch, $edit(externalRef: '  ')))->toThrow(InvalidDispatch::class, 'Mã đơn ngoài không được để trống.')
         ->and(fn () => $editor->edit($this->seller, $dispatch, $edit(externalRef: str_repeat('X', 101))))->toThrow(InvalidDispatch::class, 'Mã đơn ngoài dài quá 100 ký tự.')
-        ->and(fn () => $editor->edit(staffMember(Role::Importer), $dispatch, $edit()))->toThrow(MissingRole::class)
+        ->and(fn () => $editor->edit(staffInRole('importer'), $dispatch, $edit()))->toThrow(MissingPermission::class)
         ->and($editor->edit($this->seller, $dispatch, $edit(externalRef: 'SP-001'))->external_ref)->toBe('SP-001')
         ->and($otherChannel->fresh()->external_ref)->toBe('SP-001');
 
     DB::table('dispatches')->where('id', $first->id)->update(['status' => DispatchStatus::Cancelled->value]);
 
     expect($editor->canEdit($this->seller, $dispatch))->toBeTrue()
-        ->and($editor->canEdit(staffMember(Role::Importer), $dispatch))->toBeFalse()
+        ->and($editor->canEdit(staffInRole('importer'), $dispatch))->toBeFalse()
         ->and($editor->canEdit($this->seller, $first->fresh()))->toBeFalse()
         ->and(fn () => $editor->edit($this->seller, $first, $edit(externalRef: 'ZL-001', customer: 'Khách')))
         ->toThrow(InvalidDispatch::class, 'Chỉ sửa được Phiếu xuất Hoàn tất.')
@@ -284,7 +283,7 @@ it('tìm theo Khoá chống trùng: chuẩn hoá theo từng Sản phẩm, khớ
         ->and($found('AAAA-000'))->toBe([])
         ->and($found('AAAA-0002'))->toBe([])
         ->and($found('   '))->toBe([])
-        ->and(fn () => $lookup->byDedupeKey(staffMember(Role::Importer), 'AAAA-0001'))->toThrow(MissingRole::class)
+        ->and(fn () => $lookup->byDedupeKey(staffInRole('importer'), 'AAAA-0001'))->toThrow(MissingPermission::class)
         ->and(RevealLogEntry::count())->toBe(0);
 });
 

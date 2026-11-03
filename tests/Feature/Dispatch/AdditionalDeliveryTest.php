@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\ProductCatalog;
@@ -42,9 +41,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
-    $this->otherSeller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
+    $this->otherSeller = staffInRole('sale');
     $this->manual = app(ManualDispatch::class);
     $this->reveal = app(ContentReveal::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -218,12 +217,12 @@ it('Giao thêm báo lỗi kiểm tra và không thêm gì', function (Closure $l
 it('Bán hàng và Quản trị Giao thêm được, Nhập kho thì không', function () {
     additionalStock($this->steam, "SR1\tA-1\nSR2\tA-2");
     $dispatch = $this->manual->create($this->seller, new DispatchDraft($this->shopee, 'SP-001', additionalLines([[$this->steam, 1]])));
-    $stocker = staffMember(Role::Importer);
+    $stocker = staffInRole('importer');
 
     expect($this->manual->canAddLines($this->seller, $dispatch))->toBeTrue()
         ->and($this->manual->canAddLines($this->admin, $dispatch))->toBeTrue()
         ->and($this->manual->canAddLines($stocker, $dispatch))->toBeFalse()
-        ->and(fn () => $this->manual->addLines($stocker, $dispatch, additionalLines([[$this->steam, 1]])))->toThrow(MissingRole::class)
+        ->and(fn () => $this->manual->addLines($stocker, $dispatch, additionalLines([[$this->steam, 1]])))->toThrow(MissingPermission::class)
         ->and($this->manual->addLines($this->admin, $dispatch, additionalLines([[$this->steam, 1]]))->deliveries()->count())->toBe(2);
 
     DB::table('dispatches')->where('id', $dispatch->id)->update(['status' => DispatchStatus::Cancelled->value]);

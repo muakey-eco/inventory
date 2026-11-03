@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Warranty;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\DeliveryTemplate;
 use App\Inventory\Dispatch\DispatchLineKind;
 use App\Inventory\Dispatch\InvalidDispatch;
@@ -30,17 +30,18 @@ use Illuminate\Support\Facades\DB;
  * giao gốc; Đổi hàng nối tiếp luôn trỏ về lần giao gốc. Chọn Slot theo Thứ tự xuất nhưng thay Hạn
  * còn lại tối thiểu bằng Hạn sử dụng phủ Hạn bảo hành kế thừa; không có Slot phủ đủ thì chỉ đổi khi
  * nhân viên chấp nhận Slot hạn ngắn hơn. Mặc định cùng Sản phẩm (kể cả Ngừng bán); Sản phẩm khác
- * bắt buộc lý do. Bán hàng tự làm lần đổi 1–2 của chuỗi; từ lần 3 Bán hàng yêu cầu, Quản trị duyệt
- * rồi Bán hàng mới Đổi hàng được (Quản trị tự làm thì không cần duyệt riêng). Giá vốn Slot thay thế
+ * bắt buộc lý do. Lần đổi 1–2 của chuỗi thì cứ có Quyền Báo lỗi và Đổi hàng là làm; từ lần 3 phải
+ * xin duyệt, người có Quyền Duyệt Đổi hàng duyệt rồi mới Đổi hàng được (người có Quyền đó tự làm
+ * thì không cần duyệt riêng). Giá vốn Slot thay thế
  * lưu làm Chi phí đổi hàng, gắn Sản phẩm và Nhà cung cấp của Đơn vị hàng lỗi.
  */
 class ReplacementDelivery
 {
-    /** Từ lần đổi thứ này trong một chuỗi, Đổi hàng cần Quản trị duyệt. */
+    /** Từ lần đổi thứ này trong một chuỗi, Đổi hàng cần người có Quyền Duyệt Đổi hàng duyệt. */
     public const APPROVAL_SEQUENCE = 3;
 
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private KeyFingerprints $fingerprints,
         private StockLedger $ledger,
     ) {}
@@ -48,11 +49,11 @@ class ReplacementDelivery
     /**
      * @param  ?Product  $product  Sản phẩm muốn giao ra; null là cùng Sản phẩm với Đơn vị hàng lỗi
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function preview(User $actor, DefectReport $report, ?Product $product = null): ReplacementPreview
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
 
         $delivery = Delivery::query()->with('stockUnit.product')->findOrFail($report->delivery_id);
         $original = self::originalDelivery($delivery);
@@ -94,28 +95,27 @@ class ReplacementDelivery
      */
     public function canReplace(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::Sale)
+        return $this->gate->allows($actor, Permission::DefectReport)
             && $report->isAwaitingReplacement()
             && ! $this->needsApproval($actor, $report, self::nextSequence(self::originalDelivery($report->delivery)));
     }
 
     /**
-     * Bán hàng yêu cầu Quản trị duyệt Đổi hàng từ lần đổi thứ 3 của chuỗi; Báo lỗi vào danh sách Chờ
-     * Quản trị duyệt.
+     * Xin duyệt Đổi hàng từ lần đổi thứ 3 của chuỗi; Báo lỗi vào danh sách Chờ duyệt.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReplacement
      */
     public function requestApproval(User $actor, DefectReport $report): void
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
 
         DB::transaction(function () use ($actor, $report): void {
             $current = self::lockAwaiting($report);
             self::ensureApprovable($current);
 
             if ($current->replacement_approval_requested_at !== null) {
-                throw new InvalidReplacement(['Đã yêu cầu Quản trị duyệt Đổi hàng.']);
+                throw new InvalidReplacement(['Đã xin duyệt Đổi hàng.']);
             }
 
             $current->forceFill([
@@ -126,27 +126,27 @@ class ReplacementDelivery
     }
 
     /**
-     * Để panel ẩn nút, không thay cho kiểm tra trong {@see requestApproval()}. Quản trị không cần yêu cầu.
+     * Để panel ẩn nút, không thay cho kiểm tra trong {@see requestApproval()}. Người có Quyền Duyệt
+     * Đổi hàng đổi thẳng, không cần xin.
      */
     public function canRequestApproval(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::Sale)
-            && ! $this->roles->allows($actor)
+        return $this->gate->allows($actor, Permission::DefectReport)
+            && ! $this->gate->allows($actor, Permission::ReplacementApprove)
             && $report->replacement_approval_requested_at === null
             && $this->isApprovable($report);
     }
 
     /**
-     * Quản trị duyệt Đổi hàng từ lần đổi thứ 3 của chuỗi, để Bán hàng Đổi hàng được; không cần có yêu
-     * cầu trước.
+     * Duyệt Đổi hàng từ lần đổi thứ 3 của chuỗi, để người xin Đổi hàng được; không cần có yêu cầu
+     * trước.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReplacement
      */
     public function approve(User $actor, DefectReport $report): void
     {
-        // Không truyền Vai trò nào: chỉ Quản trị duyệt.
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::ReplacementApprove);
 
         DB::transaction(function () use ($actor, $report): void {
             $current = self::lockAwaiting($report);
@@ -164,11 +164,11 @@ class ReplacementDelivery
      */
     public function canApprove(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor) && $this->isApprovable($report);
+        return $this->gate->allows($actor, Permission::ReplacementApprove) && $this->isApprovable($report);
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReplacement
      * @throws InvalidDispatch
      * @throws OutOfStock
@@ -176,7 +176,7 @@ class ReplacementDelivery
      */
     public function replace(User $actor, DefectReport $report, ReplacementDraft $draft): Replacement
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $report, $draft): Replacement {
@@ -193,7 +193,7 @@ class ReplacementDelivery
             $problems = [];
 
             if ($this->needsApproval($actor, $current, $sequence)) {
-                $problems[] = "Lần đổi thứ {$sequence} trong chuỗi cần Quản trị duyệt.";
+                $problems[] = "Lần đổi thứ {$sequence} trong chuỗi cần người có Quyền Duyệt Đổi hàng duyệt.";
             }
 
             if (! $sameProduct && $productChangeReason === '') {
@@ -233,7 +233,7 @@ class ReplacementDelivery
                 'defective_product_id' => $unit->product_id,
                 'supplier_id' => $unit->batchLine->batch->supplier_id,
                 'created_by' => $actor->getKey(),
-                // Quản trị tự làm thì chính họ là người duyệt.
+                // Người có Quyền Duyệt Đổi hàng tự làm thì chính họ là người duyệt.
                 'approved_by' => $sequence >= self::APPROVAL_SEQUENCE ? ($current->replacement_approved_by ?? $actor->getKey()) : null,
             ])->save();
 
@@ -251,7 +251,7 @@ class ReplacementDelivery
     {
         return $sequence >= self::APPROVAL_SEQUENCE
             && $report->replacement_approved_at === null
-            && ! $this->roles->allows($actor);
+            && ! $this->gate->allows($actor, Permission::ReplacementApprove);
     }
 
     /**
@@ -270,11 +270,11 @@ class ReplacementDelivery
     private static function ensureApprovable(DefectReport $report): void
     {
         if (self::nextSequence(self::originalDelivery($report->delivery)) < self::APPROVAL_SEQUENCE) {
-            throw new InvalidReplacement(['Chỉ từ lần đổi thứ '.self::APPROVAL_SEQUENCE.' trong chuỗi mới cần Quản trị duyệt.']);
+            throw new InvalidReplacement(['Chỉ từ lần đổi thứ '.self::APPROVAL_SEQUENCE.' trong chuỗi mới cần duyệt.']);
         }
 
         if ($report->replacement_approved_at !== null) {
-            throw new InvalidReplacement(['Đổi hàng đã được Quản trị duyệt.']);
+            throw new InvalidReplacement(['Đổi hàng đã được duyệt.']);
         }
     }
 

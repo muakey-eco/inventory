@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Dispatch;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Security\SecurityEvent;
 use App\Inventory\Security\SecurityLog;
 use App\Models\User;
@@ -14,7 +15,7 @@ use stdClass;
 
 /**
  * Tạm dừng xuất kho: trạng thái toàn kho trong đó không Kênh bán nào, kể cả kênh API, Giữ hàng hay
- * Giao hàng được. Chỉ Quản trị bật hoặc tắt, kèm lý do, và mỗi lần ghi Nhật ký bảo mật. Kho cũng vào
+ * Giao hàng được. Chỉ người có Quyền Tạm dừng xuất kho bật hoặc tắt, kèm lý do, và mỗi lần ghi Nhật ký bảo mật. Kho cũng vào
  * trạng thái này sau khi khôi phục từ backup (lệnh `inventory:dispatches:freeze`), lúc chưa có ai
  * đăng nhập.
  *
@@ -29,7 +30,7 @@ class DispatchFreeze
 
     private const ROW = 1;
 
-    public function __construct(private RoleGate $roles, private SecurityLog $log) {}
+    public function __construct(private PermissionGate $gate, private SecurityLog $log) {}
 
     /**
      * Chặn một lần Giữ hàng hoặc Giao hàng khi kho đang tạm dừng. Người gọi chạy trong transaction:
@@ -66,14 +67,14 @@ class DispatchFreeze
     }
 
     /**
-     * Quản trị bật Tạm dừng xuất kho kèm lý do.
+     * Bật Tạm dừng xuất kho kèm lý do.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDispatch
      */
     public function freeze(User $actor, string $reason): void
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::DispatchFreeze);
         $reason = self::requiredReason($reason, 'Bật Tạm dừng xuất kho phải nhập lý do.');
 
         DB::transaction(function () use ($actor, $reason): void {
@@ -84,14 +85,14 @@ class DispatchFreeze
     }
 
     /**
-     * Quản trị tắt Tạm dừng xuất kho kèm lý do (thường là "đã đối chiếu xong").
+     * Tắt Tạm dừng xuất kho kèm lý do (thường là "đã đối chiếu xong").
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDispatch
      */
     public function unfreeze(User $actor, string $reason): void
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::DispatchFreeze);
         $reason = self::requiredReason($reason, 'Tắt Tạm dừng xuất kho phải nhập lý do.');
 
         DB::transaction(function () use ($actor, $reason): void {

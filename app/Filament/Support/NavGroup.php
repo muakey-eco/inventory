@@ -6,12 +6,12 @@ use Filament\Support\Contracts\HasLabel;
 
 /**
  * Nhóm trong sidebar của panel. Thứ tự case là thứ tự nhóm hiện ra: nhóm được dùng dày nhất lên
- * trên, nhóm chỉ Quản trị thấy nằm đáy. AdminPanelProvider lấy cả nhãn lẫn thứ tự từ đây, nên
+ * trên, nhóm quản trị kho nằm đáy. AdminPanelProvider lấy cả nhãn lẫn thứ tự từ đây, nên
  * thêm nhóm mới là thêm một case và một nhánh match, không phải sửa AdminPanelProvider.
  *
  * Thứ tự các mục *trong* một nhóm nằm ở $navigationSort của từng Resource/Page.
  *
- * Nhập hàng và Xuất hàng là *công việc*, không phải Vai trò (xem CONTEXT.md).
+ * Nhập hàng và Xuất hàng là *công việc*, không phải nhóm Quyền (xem CONTEXT.md).
  */
 enum NavGroup implements HasLabel
 {

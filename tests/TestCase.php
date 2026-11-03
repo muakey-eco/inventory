@@ -2,7 +2,7 @@
 
 namespace Tests;
 
-use App\Inventory\Staff\StaffMirror;
+use App\Inventory\Access\Permission;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -25,12 +25,12 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Nhân viên đăng nhập kho qua platform giả (ADR 0011), với `access` và đúng Permission ứng với
-     * bản chụp Vai trò của họ: request HTTP mang Phiên App giả và đi qua guard như thật.
+     * bản chụp Quyền của họ: request HTTP mang Phiên App giả và đi qua guard như thật.
      *
      * Guard `platform` chỉ nhận user qua middleware và quên user khi request đổi. Code chạy ngay
      * trong thân test thấy nhân viên đặt sẵn; `Livewire::test` gọi component bằng request mới mà
      * không chạy middleware, nên chỉ ở những request đó nhân viên được đặt lại. Ở đó không có
-     * Permission của request, RoleGate đọc bản chụp.
+     * Permission của request, PermissionGate đọc bản chụp.
      *
      * @param  string|null  $guard
      */
@@ -40,7 +40,7 @@ abstract class TestCase extends BaseTestCase
             throw new InvalidArgumentException('Chỉ nhân viên mới đăng nhập kho.');
         }
 
-        $this->actingAsPlatformUser($user, ['access', ...StaffMirror::roleNames($user->roles)]);
+        $this->actingAsPlatformUser($user, ['access', ...Permission::names($user->permissions)]);
 
         Auth::guard('platform')->setUser($user);
         $this->app->rebinding('request', function () use ($user): void {

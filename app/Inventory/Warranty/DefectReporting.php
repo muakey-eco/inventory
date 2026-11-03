@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Warranty;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Inventory\Dispatch\DeliveryTemplate;
 use App\Inventory\Stock\SlotStatus;
@@ -24,7 +24,7 @@ use Throwable;
 
 /**
  * Báo lỗi và xác minh: nhân viên ghi nhận Slot đã giao mà khách báo không dùng được, xác minh rồi
- * Xác nhận (chọn Phạm vi lỗi) hoặc Bác bỏ; người tạo tự xác minh được. Bán hàng và Quản trị. Trong
+ * Xác nhận (chọn Phạm vi lỗi) hoặc Bác bỏ; người tạo tự xác minh được. Cần Quyền Báo lỗi và Đổi hàng. Trong
  * lúc Chờ xác minh, Slot Còn hàng của cùng Đơn vị hàng không thuộc Tồn bán được. Không tự Đổi hàng.
  */
 class DefectReporting
@@ -32,24 +32,24 @@ class DefectReporting
     public const SCREENSHOT_DIRECTORY = 'defect-reports';
 
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private StockDefect $defects,
     ) {}
 
     /**
-     * Mỗi lần giao một Báo lỗi Chờ xác minh, cùng mô tả và ảnh. Bán hàng chỉ tạo trong Hạn bảo hành
-     * của Sản phẩm có bảo hành; Quản trị vượt được kèm lý do. Lỗi ở bất kỳ lần giao nào thì không
+     * Mỗi lần giao một Báo lỗi Chờ xác minh, cùng mô tả và ảnh. Chỉ tạo trong Hạn bảo hành của
+     * Sản phẩm có bảo hành; người có Quyền Vượt hạn vượt được kèm lý do. Lỗi ở bất kỳ lần giao nào thì không
      * tạo gì.
      *
      * @param  list<Delivery>  $deliveries
      * @return list<DefectReport> theo thứ tự lần giao truyền vào
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectReport
      */
     public function report(User $actor, array $deliveries, DefectReportDraft $draft): array
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
 
         $description = trim($draft->description);
 
@@ -116,13 +116,13 @@ class DefectReporting
      */
     public function canReport(User $actor, Delivery $delivery): bool
     {
-        return $this->roles->allows($actor, Role::Sale)
+        return $this->gate->allows($actor, Permission::DefectReport)
             && self::reportBlocker($delivery) === null
-            && (self::warrantyProblem($delivery) === null || $this->roles->allows($actor));
+            && (self::warrantyProblem($delivery) === null || $this->gate->allows($actor, Permission::DeadlineOverride));
     }
 
     /**
-     * Lần giao ngoài bảo hành: Báo lỗi cần Quản trị kèm lý do. Để panel hiện ô lý do.
+     * Lần giao ngoài bảo hành: Báo lỗi cần Quyền Vượt hạn kèm lý do. Để panel hiện ô lý do.
      */
     public static function isOutOfWarranty(Delivery $delivery): bool
     {
@@ -135,11 +135,11 @@ class DefectReporting
      * @param  list<Delivery>  $deliveries
      * @return Collection<int, DefectReport>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rejectedReports(User $actor, array $deliveries): Collection
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
 
         return DefectReport::query()
             ->with(['creator', 'verifier'])
@@ -154,12 +154,12 @@ class DefectReporting
      * động chuyển Lỗi và ghi Sổ biến động kho (Slot Còn hàng thành Tồn lỗi); chỉ Slot: Đơn vị hàng
      * giữ nguyên, Slot trong kho bán lại được.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectReport
      */
     public function confirm(User $actor, DefectReport $report, DefectScope $scope, string $note): void
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
         $note = self::verificationNote($note);
 
         DB::transaction(function () use ($actor, $report, $scope, $note): void {
@@ -186,12 +186,12 @@ class DefectReporting
      * Bác bỏ Báo lỗi Chờ xác minh với ghi chú bắt buộc; Slot trong kho của Đơn vị hàng bán lại được
      * (nếu không còn Báo lỗi Chờ xác minh khác).
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectReport
      */
     public function reject(User $actor, DefectReport $report, string $note): void
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
         $note = self::verificationNote($note);
 
         DB::transaction(fn () => self::recordVerification(self::lockPending($report), $actor, DefectReportStatus::Rejected, $note, null));
@@ -202,7 +202,7 @@ class DefectReporting
      */
     public function canVerify(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::Sale) && $report->status === DefectReportStatus::Pending;
+        return $this->gate->allows($actor, Permission::DefectReport) && $report->status === DefectReportStatus::Pending;
     }
 
     /**
@@ -210,12 +210,12 @@ class DefectReporting
      * kho thì đánh dấu `$refunded`: Giá bán của Dòng xuất cần sửa xuống số tiền shop thực giữ, qua
      * sửa Phiếu xuất (có lịch sử). Kết quả xử lý không đổi lại được.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectReport
      */
     public function declineReplacement(User $actor, DefectReport $report, string $reason, bool $refunded): void
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
         $reason = trim($reason);
 
         if ($reason === '') {
@@ -249,7 +249,7 @@ class DefectReporting
      */
     public function canDeclineReplacement(User $actor, DefectReport $report): bool
     {
-        return $this->roles->allows($actor, Role::Sale) && $report->isAwaitingReplacement();
+        return $this->gate->allows($actor, Permission::DefectReport) && $report->isAwaitingReplacement();
     }
 
     /**
@@ -258,11 +258,11 @@ class DefectReporting
      *
      * @return list<AffectedDelivery>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function affectedDeliveries(User $actor, DefectReport $report): array
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
 
         $current = DefectReport::query()->with('stockUnit')->findOrFail($report->getKey());
 
@@ -271,12 +271,12 @@ class DefectReporting
 
     /**
      * Lần giao bị ảnh hưởng mà nhân viên tạo Báo lỗi hàng loạt được lúc này: chưa có Báo lỗi Chờ xác
-     * minh hay Xác nhận, trong Hạn bảo hành (hoặc nhân viên là Quản trị). Để panel chọn lần giao và
+     * minh hay Xác nhận, trong Hạn bảo hành (hoặc nhân viên có Quyền Vượt hạn). Để panel chọn lần giao và
      * ẩn nút, không thay cho kiểm tra trong {@see confirmAffected()}.
      *
      * @return list<AffectedDelivery>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function reportableAffectedDeliveries(User $actor, DefectReport $report): array
     {
@@ -298,12 +298,12 @@ class DefectReporting
      * @param  list<Delivery>  $deliveries
      * @return list<DefectReport> theo thứ tự lần giao truyền vào
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectReport
      */
     public function confirmAffected(User $actor, DefectReport $source, array $deliveries, ?string $overrideReason = null): array
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
 
         return DB::transaction(function () use ($actor, $source, $deliveries, $overrideReason): array {
             $current = DefectReport::query()->with('stockUnit')->sharedLock()->findOrFail($source->getKey());
@@ -380,7 +380,7 @@ class DefectReporting
                 continue;
             }
 
-            if (! $problem->overridable || ! $this->roles->allows($actor)) {
+            if (! $problem->overridable || ! $this->gate->allows($actor, Permission::DeadlineOverride)) {
                 $problems[] = "Lần giao {$delivery->unitLabel()}: {$problem->message}";
             }
 
@@ -419,12 +419,12 @@ class DefectReporting
     private static function warrantyProblem(Delivery $delivery): ?ReportProblem
     {
         if ($delivery->warranty_days === 0) {
-            return new ReportProblem('Sản phẩm không có bảo hành; chỉ Quản trị tạo Báo lỗi được, kèm lý do.', overridable: true);
+            return new ReportProblem('Sản phẩm không có bảo hành; chỉ người có Quyền Vượt hạn tạo Báo lỗi được, kèm lý do.', overridable: true);
         }
 
         if (CarbonImmutable::today()->gt($delivery->warrantyEndsOn())) {
             return new ReportProblem(sprintf(
-                'đã quá Hạn bảo hành %s; chỉ Quản trị tạo Báo lỗi được, kèm lý do.',
+                'đã quá Hạn bảo hành %s; chỉ người có Quyền Vượt hạn tạo Báo lỗi được, kèm lý do.',
                 $delivery->warrantyEndsOn()->format(DeliveryTemplate::DATE_FORMAT),
             ), overridable: true);
         }

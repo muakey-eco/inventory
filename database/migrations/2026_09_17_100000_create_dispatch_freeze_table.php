@@ -29,7 +29,7 @@ return new class extends Migration
         });
 
         DB::statement('ALTER TABLE dispatch_freeze ADD CONSTRAINT dispatch_freeze_single_row CHECK (id = 1)');
-        // Đang tạm dừng thì luôn có lý do: Quản trị đọc lại sau này cần biết vì sao kho dừng.
+        // Đang tạm dừng thì luôn có lý do: người đọc lại sau này cần biết vì sao kho dừng.
         DB::statement('ALTER TABLE dispatch_freeze ADD CONSTRAINT dispatch_freeze_reason_with_state CHECK ((frozen_at IS NULL) = (reason IS NULL))');
 
         DB::table('dispatch_freeze')->insert(['id' => 1, 'updated_at' => now()]);

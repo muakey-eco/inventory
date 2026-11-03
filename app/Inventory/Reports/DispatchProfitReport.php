@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Reports;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\User;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -18,25 +19,25 @@ use stdClass;
  * Slot Giao thay tính vào Dòng xuất gốc. Phiếu mà mọi Dòng xuất đều chưa ghi Giá bán không có dòng ở
  * đây: chúng nằm ở dòng 'Chưa có Giá bán' của báo cáo theo Sản phẩm.
  *
- * Chỉ Quản trị. Xem hay xuất báo cáo không ghi nhật ký.
+ * Cần Quyền Xem Lãi/lỗ. Xem hay xuất báo cáo không ghi nhật ký.
  */
 class DispatchProfitReport
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user);
+        return $this->gate->allows($user, Permission::ReportProfit);
     }
 
     /**
      * @return list<DispatchProfitRow> theo số Phiếu xuất
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rows(User $actor, ProfitReportFilter $filter): array
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::ReportProfit);
 
         return array_map(
             fn (stdClass $record): DispatchProfitRow => DispatchProfitRow::fromRecord($record),
@@ -65,7 +66,7 @@ class DispatchProfitReport
     /**
      * File báo cáo. Không ghi nhật ký.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function export(User $actor, ProfitReportFilter $filter, ReportFormat $format): ReportExport
     {

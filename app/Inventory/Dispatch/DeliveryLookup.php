@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Dispatch;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Encryption\DedupeHashesStale;
 use App\Inventory\Encryption\DedupeLookup;
 use App\Inventory\Encryption\KeyFingerprintMismatch;
@@ -21,7 +21,7 @@ use SensitiveParameter;
 class DeliveryLookup
 {
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private KeyFingerprints $fingerprints,
         private DedupeLookup $dedupe,
     ) {}
@@ -29,13 +29,13 @@ class DeliveryLookup
     /**
      * @return Collection<int, Delivery> theo thứ tự giao
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws KeyFingerprintMismatch
      * @throws DedupeHashesStale đang xoay khoá mã hoá HMAC nên hash chưa tính lại xong
      */
     public function byDedupeKey(User $actor, #[SensitiveParameter] string $value): Collection
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
         // Sai khoá HMAC thì mọi hash lệch và tra cứu âm thầm không thấy gì: báo lỗi thay vì trả rỗng.
         $this->fingerprints->verify();
 

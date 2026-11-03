@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Reports;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Claims\ClaimOutcome;
 use App\Inventory\Claims\SupplierClaimStatus;
 use App\Models\User;
@@ -19,25 +20,25 @@ use stdClass;
  * nhưng chỉ lấy phần lỗi **thuộc về Nhà cung cấp**: Giá vốn hàng Lỗi và Chi phí đổi hàng. Tổn thất
  * Huỷ hàng và Tổn thất hết hạn là chuyện của shop nên đứng ngoài.
  *
- * Chỉ Quản trị. Xem hay xuất báo cáo không ghi nhật ký.
+ * Cần Quyền Xem Lãi/lỗ. Xem hay xuất báo cáo không ghi nhật ký.
  */
 class SupplierLossReport
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user);
+        return $this->gate->allows($user, Permission::ReportProfit);
     }
 
     /**
      * @return list<SupplierLossRow> theo tên Nhà cung cấp
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rows(User $actor, ProfitReportFilter $filter): array
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::ReportProfit);
 
         return array_map(
             fn (stdClass $record): SupplierLossRow => SupplierLossRow::fromRecord($record),
@@ -66,7 +67,7 @@ class SupplierLossReport
     /**
      * File báo cáo. Không ghi nhật ký.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function export(User $actor, ProfitReportFilter $filter, ReportFormat $format): ReportExport
     {

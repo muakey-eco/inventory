@@ -2,25 +2,26 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\RevealLogEntry;
 use App\Models\User;
 
 /**
- * Nhật ký xem mã: chỉ Quản trị xem; không ai tạo, sửa, xoá qua giao diện.
+ * Nhật ký xem mã: chỉ người có Quyền Xem nhật ký xem; không ai tạo, sửa, xoá qua giao diện.
  */
 class RevealLogEntryPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user);
+        return $this->gate->allows($user, Permission::LogView);
     }
 
     public function view(User $user, RevealLogEntry $entry): bool
     {
-        return $this->roles->allows($user);
+        return $this->gate->allows($user, Permission::LogView);
     }
 
     public function create(User $user): bool

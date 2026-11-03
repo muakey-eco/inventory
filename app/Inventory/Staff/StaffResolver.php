@@ -13,7 +13,7 @@ use Muakey\Platform\PlatformIdentity;
  * Callback đăng nhập của SDK platform gọi ở đây sau khi platform đã kiểm nhân viên `active` và có
  * `access` (ADR 0011). Nhân viên khớp chỉ theo id trên platform, không bao giờ theo email: email
  * chỉ là bản sao và một email cũ có thể sang tay người khác. Chưa có thì tạo mới, với bản chụp
- * Vai trò rỗng: request đầu vào panel điền nó ({@see StaffMirror::syncRoles()}). Tên và email đồng
+ * Quyền rỗng: request đầu vào panel điền nó ({@see StaffMirror::syncPermissions()}). Tên và email đồng
  * bộ lại mỗi lần. Khoá nhân viên là của kho nên đăng nhập lại không mở khoá; panel chặn họ.
  */
 class StaffResolver implements PlatformUserResolver

@@ -42,7 +42,7 @@ class SecurityLogEntry extends Model
     }
 
     /**
-     * Quản trị thực hiện thao tác; null khi sự kiện không do ai khác gây ra hoặc làm từ server.
+     * Nhân viên thực hiện thao tác; null khi sự kiện không do ai khác gây ra hoặc làm từ server.
      *
      * @return BelongsTo<User, $this>
      */

@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -50,9 +49,9 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
     $this->report = app(ProfitReport::class);
 
     $this->netflix = productOf(
@@ -430,8 +429,8 @@ it('chỉ Quản trị xem được báo cáo Lãi/lỗ', function () {
     expect($this->report->canView($this->admin))->toBeTrue()
         ->and($this->report->canView($this->stocker))->toBeFalse()
         ->and($this->report->canView($this->seller))->toBeFalse()
-        ->and(fn () => $this->report->rows($this->stocker, septemberProfit()))->toThrow(MissingRole::class)
-        ->and(fn () => $this->report->rows($this->seller, septemberProfit()))->toThrow(MissingRole::class);
+        ->and(fn () => $this->report->rows($this->stocker, septemberProfit()))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->report->rows($this->seller, septemberProfit()))->toThrow(MissingPermission::class);
 });
 
 it('xuất CSV gồm dòng tổng, không ghi Nhật ký xem mã hay Nhật ký bảo mật', function () {

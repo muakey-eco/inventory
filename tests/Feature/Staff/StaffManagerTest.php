@@ -1,10 +1,10 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Security\SecurityEvent;
-use App\Inventory\Staff\LastActiveAdmin;
+use App\Inventory\Staff\LastActiveStaffManager;
 use App\Inventory\Staff\PlatformRevocation;
 use App\Inventory\Staff\StaffManager;
 use App\Models\SecurityLogEntry;
@@ -15,34 +15,34 @@ beforeEach(function () {
 });
 
 it('Quản trị Khoá nhân viên và ghi Nhật ký bảo mật', function () {
-    $admin = staffMember(Role::Admin);
-    $seller = staffMember(Role::Sale);
+    $admin = staffInRole('admin');
+    $seller = staffInRole('sale');
 
     $this->staff->deactivate($admin, $seller);
 
     expect($seller->fresh()->isDeactivated())->toBeTrue()
-        ->and(app(RoleGate::class)->allows($seller->fresh(), Role::Sale))->toBeFalse()
+        ->and(app(PermissionGate::class)->allows($seller->fresh(), Permission::Dispatch))->toBeFalse()
         ->and(SecurityLogEntry::where('event', SecurityEvent::StaffDeactivated)->sole())
         ->user_id->toBe($seller->id)
         ->actor_id->toBe($admin->id);
 });
 
-it('chỉ Quản trị Khoá được nhân viên', function (Role $role) {
-    $seller = staffMember(Role::Sale);
+it('chỉ Quản trị Khoá được nhân viên', function (string $role) {
+    $seller = staffInRole('sale');
 
-    expect(fn () => $this->staff->deactivate(staffMember($role), $seller))
-        ->toThrow(MissingRole::class);
+    expect(fn () => $this->staff->deactivate(staffInRole($role), $seller))
+        ->toThrow(MissingPermission::class);
 
     expect($seller->fresh()->isDeactivated())->toBeFalse()
         ->and(SecurityLogEntry::where('event', SecurityEvent::StaffDeactivated)->exists())->toBeFalse();
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);
 
 it('Khoá nhân viên cắt ngay phiên đang mở', function () {
-    $admin = staffMember(Role::Admin);
-    $seller = staffMember(Role::Sale);
+    $admin = staffInRole('admin');
+    $seller = staffInRole('sale');
     $panelUrl = Filament::getPanel('admin')->getUrl();
 
     $this->actingAs($seller)->get($panelUrl)->assertOk();
@@ -54,35 +54,52 @@ it('Khoá nhân viên cắt ngay phiên đang mở', function () {
 });
 
 it('chặn Khoá Quản trị đang hoạt động cuối cùng', function () {
-    $admin = staffMember(Role::Admin);
+    $admin = staffInRole('admin');
 
     expect(fn () => $this->staff->deactivate($admin, $admin))
-        ->toThrow(LastActiveAdmin::class);
+        ->toThrow(LastActiveStaffManager::class);
 
     expect($admin->fresh()->isDeactivated())->toBeFalse()
         ->and(SecurityLogEntry::where('event', SecurityEvent::StaffDeactivated)->exists())->toBeFalse();
 });
 
+it('người cuối cùng có Quyền quản Nhân viên không bị khoá, dù còn người khác mang mọi Quyền còn lại', function () {
+    $manager = staffMember(Permission::StaffManage);
+    staffMember(...array_values(array_filter(Permission::cases(), fn (Permission $permission): bool => $permission !== Permission::StaffManage)));
+
+    expect(fn () => $this->staff->deactivate($manager, $manager))
+        ->toThrow(LastActiveStaffManager::class);
+});
+
+it('khoá được người có Quyền quản Nhân viên khi còn người khác đang hoạt động có Quyền đó', function () {
+    $manager = staffMember(Permission::StaffManage);
+    staffMember(Permission::StaffManage);
+
+    $this->staff->deactivate($manager, $manager);
+
+    expect($manager->fresh()->isDeactivated())->toBeTrue();
+});
+
 it('Quản trị đã bị khoá không tính là Quản trị đang hoạt động', function () {
-    $owner = staffMember(Role::Admin);
-    $other = staffMember(Role::Admin);
+    $owner = staffInRole('admin');
+    $other = staffInRole('admin');
     $this->staff->deactivate($owner, $other);
 
     expect(fn () => $this->staff->deactivate($owner, $owner))
-        ->toThrow(LastActiveAdmin::class);
+        ->toThrow(LastActiveStaffManager::class);
 });
 
 it('Quản trị đang mất quyền theo platform không tính là Quản trị đang hoạt động', function () {
-    $admin = staffMember(Role::Admin);
-    staffMember(Role::Admin)->forceFill(['platform_revoked_at' => now(), 'platform_revoked_reason' => PlatformRevocation::Suspended])->save();
+    $admin = staffInRole('admin');
+    staffInRole('admin')->forceFill(['platform_revoked_at' => now(), 'platform_revoked_reason' => PlatformRevocation::Suspended])->save();
 
     expect(fn () => $this->staff->deactivate($admin, $admin))
-        ->toThrow(LastActiveAdmin::class);
+        ->toThrow(LastActiveStaffManager::class);
 });
 
 it('Quản trị mở khoá nhân viên và ghi Nhật ký bảo mật', function () {
-    $admin = staffMember(Role::Admin);
-    $seller = staffMember(Role::Sale);
+    $admin = staffInRole('admin');
+    $seller = staffInRole('sale');
     $this->staff->deactivate($admin, $seller);
 
     $this->staff->reactivate($admin, $seller);
@@ -93,16 +110,16 @@ it('Quản trị mở khoá nhân viên và ghi Nhật ký bảo mật', functio
         ->actor_id->toBe($admin->id);
 });
 
-it('chỉ Quản trị mở khoá được nhân viên', function (Role $role) {
-    $admin = staffMember(Role::Admin);
-    $seller = staffMember(Role::Sale);
+it('chỉ Quản trị mở khoá được nhân viên', function (string $role) {
+    $admin = staffInRole('admin');
+    $seller = staffInRole('sale');
     $this->staff->deactivate($admin, $seller);
 
-    expect(fn () => $this->staff->reactivate(staffMember($role), $seller))
-        ->toThrow(MissingRole::class);
+    expect(fn () => $this->staff->reactivate(staffInRole($role), $seller))
+        ->toThrow(MissingPermission::class);
 
     expect($seller->fresh()->isDeactivated())->toBeTrue();
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);

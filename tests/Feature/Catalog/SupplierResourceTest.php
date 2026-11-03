@@ -2,25 +2,24 @@
 
 use App\Filament\Resources\Suppliers\Pages\ManageSuppliers;
 use App\Filament\Resources\Suppliers\SupplierResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\SupplierDirectory;
 use App\Models\Supplier;
 use Filament\Actions\CreateAction;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
-it('Quản trị và Nhập kho vào được trang Nhà cung cấp, Bán hàng không thấy', function (Role $role, int $status) {
-    $this->actingAs(staffMember($role))
+it('Quản trị và Nhập kho vào được trang Nhà cung cấp, Bán hàng không thấy', function (string $role, int $status) {
+    $this->actingAs(staffInRole($role))
         ->get(SupplierResource::getUrl('index'))
         ->assertStatus($status);
 })->with([
-    'Quản trị' => [Role::Admin, 200],
-    'Nhập kho' => [Role::Importer, 200],
-    'Bán hàng' => [Role::Sale, 403],
+    'Quản trị' => ['admin', 200],
+    'Nhập kho' => ['importer', 200],
+    'Bán hàng' => ['sale', 403],
 ]);
 
 it('Nhập kho tạo, sửa và xoá Nhà cung cấp từ panel', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
 
     Livewire::test(ManageSuppliers::class)
         ->callAction(CreateAction::class, data: ['name' => 'Kinguin', 'note' => 'Telegram @kinguin'])
@@ -42,7 +41,7 @@ it('Nhập kho tạo, sửa và xoá Nhà cung cấp từ panel', function () {
 });
 
 it('panel báo lỗi khi tạo Nhà cung cấp trùng tên', function () {
-    $this->actingAs($stocker = staffMember(Role::Importer));
+    $this->actingAs($stocker = staffInRole('importer'));
     app(SupplierDirectory::class)->create($stocker, 'Kinguin');
 
     Livewire::test(ManageSuppliers::class)

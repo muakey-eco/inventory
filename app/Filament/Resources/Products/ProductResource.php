@@ -36,7 +36,7 @@ use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 /**
- * Sản phẩm trong panel. Adapter mỏng: mọi thao tác gọi ProductCatalog, nơi kiểm tra Vai trò,
+ * Sản phẩm trong panel. Adapter mỏng: mọi thao tác gọi ProductCatalog, nơi kiểm tra Quyền,
  * cấu hình hợp lệ và khoá cấu hình khi đã có hàng.
  *
  * Trường nội dung, Dạng hàng và chuẩn hoá Khoá chống trùng không có mặt ở đây: chúng thuộc
@@ -71,7 +71,7 @@ class ProductResource extends Resource
             Hidden::make('has_stock')->default(false),
             Hidden::make('has_dispatch')->default(false),
             // Hai mốc khoá khác nhau và không trùng nhau: một Sản phẩm có thể đã có hàng mà chưa
-            // từng xuất. Một hộp duy nhất, nội dung dựng theo trạng thái thật, thay vì để Quản trị
+            // từng xuất. Một hộp duy nhất, nội dung dựng theo trạng thái thật, thay vì để người khai báo
             // phát hiện giới hạn bằng cách đâm vào nó. Trang Tạo không bao giờ thấy hộp này.
             Callout::make('Cấu hình bị khoá')
                 ->warning()

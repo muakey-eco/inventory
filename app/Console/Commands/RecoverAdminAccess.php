@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Inventory\Access\MissingRole;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Staff\StaffManager;
 use App\Models\User;
 use Illuminate\Console\Attributes\Description;
@@ -10,11 +10,12 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 /**
- * Lối thoát cho Quản trị bị Khoá nhân viên mà không còn Quản trị nào khác mở được. Chỉ chạy
- * được trên server, mỗi lần ghi Nhật ký bảo mật. Đăng nhập thì nằm ở platform (ADR 0011).
+ * Lối thoát cho người có Quyền quản Nhân viên bị Khoá nhân viên mà không còn ai khác mở được. Chỉ
+ * chạy được trên server, mỗi lần ghi Nhật ký bảo mật. Đăng nhập thì nằm ở platform (ADR 0011).
+ * Tên lệnh giữ `recover-admin` vì runbook vận hành gọi theo tên đó.
  */
-#[Signature('staff:recover-admin {email : Email của Quản trị} {--unlock : Mở khoá nhân viên}')]
-#[Description('Khôi phục quyền truy cập cho Quản trị: mở khoá')]
+#[Signature('staff:recover-admin {email : Email của người có Quyền quản Nhân viên} {--unlock : Mở khoá nhân viên}')]
+#[Description('Khôi phục quyền truy cập cho người có Quyền quản Nhân viên: mở khoá')]
 class RecoverAdminAccess extends Command
 {
     public function handle(StaffManager $staff): int
@@ -36,17 +37,17 @@ class RecoverAdminAccess extends Command
             return self::FAILURE;
         }
 
-        $admin = $matches->sole();
+        $manager = $matches->sole();
 
         try {
-            $staff->recoverAdminAccess($admin);
-        } catch (MissingRole) {
-            $this->error('Nhân viên này không mang Vai trò Quản trị.');
+            $staff->recoverStaffManagerAccess($manager);
+        } catch (MissingPermission) {
+            $this->error('Nhân viên này không có Quyền quản Nhân viên.');
 
             return self::FAILURE;
         }
 
-        $this->info("Đã khôi phục quyền truy cập cho {$admin->email}.");
+        $this->info("Đã khôi phục quyền truy cập cho {$manager->email}.");
 
         return self::SUCCESS;
     }

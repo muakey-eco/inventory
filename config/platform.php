@@ -1,7 +1,7 @@
 <?php
 
 /*
-| SDK `muakey/platform-laravel`: nhân viên đăng nhập kho qua platform và nhận Vai trò từ đó
+| SDK `muakey/platform-laravel`: nhân viên đăng nhập kho qua platform và nhận Quyền từ đó
 | (ADR 0011). Route của SDK nằm dưới `/admin/auth`, cạnh panel; trang lỗi đăng nhập là
 | `/admin/dang-nhap-loi`. Bí mật (`PLATFORM_CLIENT_SECRET`, `PLATFORM_REDIS_URL`,
 | `PLATFORM_WEBHOOK_SECRET`) chỉ sống ở `.env` và Infisical.

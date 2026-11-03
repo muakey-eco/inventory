@@ -93,10 +93,10 @@ class DispatchController extends Controller
         } catch (DispatchNotFound $exception) {
             return ApiProblem::dispatchNotFound($exception->externalRef);
         } catch (DispatchFrozen) {
-            // Quản trị đã dừng toàn kho: đơn chưa mất gì, website gửi lại được sau khi kho mở lại.
+            // Kho đang Tạm dừng xuất kho: đơn chưa mất gì, website gửi lại được sau khi kho mở lại.
             return ApiProblem::frozen();
         } catch (KeyFingerprintMismatch $exception) {
-            // Khoá mã hoá không khớp DB: kho từ chối mọi đường ghi cho tới khi Quản trị xử lý.
+            // Khoá mã hoá không khớp DB: kho từ chối mọi đường ghi cho tới khi Người vận hành server xử lý.
             return ApiProblem::response(503, 'inventory_unavailable', $exception->getMessage());
         }
 

@@ -1,6 +1,5 @@
 <?php
 
-use App\Inventory\Access\Role;
 use App\Inventory\Security\SecurityEvent;
 use App\Inventory\Staff\PlatformRevocation;
 use App\Models\SecurityLogEntry;
@@ -21,7 +20,7 @@ function directorySnapshot(User $staff, UserStatus $status = UserStatus::Active,
 }
 
 it('bị đình chỉ trên platform thì Mất quyền theo platform và ghi nhật ký', function () {
-    $staff = staffMember(Role::Sale);
+    $staff = staffInRole('sale');
 
     app(DirectorySink::class)->upsert(directorySnapshot($staff, UserStatus::Suspended), seq: 7);
 
@@ -44,7 +43,7 @@ it('người chưa từng vào kho thì bỏ qua, không tạo nhân viên', fun
 });
 
 it('bản có seq không mới hơn bản đang giữ thì bỏ qua', function () {
-    $staff = staffMember(Role::Sale);
+    $staff = staffInRole('sale');
     $sink = app(DirectorySink::class);
 
     $sink->upsert(directorySnapshot($staff, UserStatus::Suspended), seq: 9);
@@ -58,7 +57,7 @@ it('bản có seq không mới hơn bản đang giữ thì bỏ qua', function (
 });
 
 it('platform cấp lại quyền thì có lại quyền, nhưng Khoá nhân viên vẫn giữ', function () {
-    $staff = staffMember(Role::Sale);
+    $staff = staffInRole('sale');
     $staff->forceFill(['deactivated_at' => now()])->save();
     $sink = app(DirectorySink::class);
 
@@ -75,7 +74,7 @@ it('platform cấp lại quyền thì có lại quyền, nhưng Khoá nhân viê
 });
 
 it('đổi từ đình chỉ sang xoá thì đổi lý do, giữ mốc mất quyền', function () {
-    $staff = staffMember(Role::Sale);
+    $staff = staffInRole('sale');
     $sink = app(DirectorySink::class);
 
     $sink->upsert(directorySnapshot($staff, UserStatus::Suspended), seq: 1);
@@ -89,7 +88,7 @@ it('đổi từ đình chỉ sang xoá thì đổi lý do, giữ mốc mất quy
 });
 
 it('snapshot không đổi gì thì không ghi nhật ký', function () {
-    $staff = staffMember(Role::Sale);
+    $staff = staffInRole('sale');
     $sink = app(DirectorySink::class);
 
     $sink->upsert(directorySnapshot($staff, UserStatus::Active), seq: 1);

@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Claims;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Stock\StockUnitStatus;
 use App\Models\StockUnit;
 use App\Models\Supplier;
@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Khiếu nại nhà cung cấp: Nhập kho (và Quản trị) đòi một Nhà cung cấp bồi hoàn cho các Đơn vị hàng
+ * Khiếu nại nhà cung cấp: người có Quyền Khiếu nại nhà cung cấp đòi một Nhà cung cấp bồi hoàn cho các Đơn vị hàng
  * Lỗi của họ. Mỗi Đơn vị hàng nằm trong nhiều nhất một khiếu nại chưa huỷ. Thao tác cần cả Đơn vị
  * hàng và khiếu nại khoá Đơn vị hàng trước (như Khôi phục), rồi mới tới khiếu nại.
  */
@@ -25,19 +25,19 @@ class SupplierClaims
     /** Lý do khi Khiếu nại Đã gửi tự huỷ vì mọi Đơn vị hàng đã Khôi phục. */
     public const AUTO_CANCEL_REASON = 'Tự huỷ: mọi Đơn vị hàng đã Khôi phục.';
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     /**
      * Tạo khiếu nại Nháp.
      *
      * @param  list<StockUnit>  $units
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplierClaim
      */
     public function create(User $actor, Supplier $supplier, array $units, ?string $note = null): SupplierClaim
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
 
         return DB::transaction(function () use ($actor, $supplier, $units, $note): SupplierClaim {
             $locked = self::lockClaimable($supplier, $units);
@@ -61,12 +61,12 @@ class SupplierClaims
      *
      * @param  list<StockUnit>  $units
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplierClaim
      */
     public function addUnits(User $actor, SupplierClaim $claim, array $units): void
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
 
         DB::transaction(function () use ($claim, $units): void {
             // Báo sai trạng thái trước lỗi của từng Đơn vị hàng; kiểm lại dưới khoá sau khi khoá Đơn vị hàng.
@@ -83,12 +83,12 @@ class SupplierClaims
     /**
      * Gỡ một Đơn vị hàng khỏi khiếu nại Nháp; dòng giữ lại làm lịch sử.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplierClaim
      */
     public function removeUnit(User $actor, SupplierClaimUnit $claimUnit): void
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
 
         DB::transaction(function () use ($claimUnit): void {
             self::ensureDraft(self::lock($claimUnit->claim()->firstOrFail()));
@@ -103,12 +103,12 @@ class SupplierClaims
     /**
      * Nháp → Đã gửi.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplierClaim
      */
     public function send(User $actor, SupplierClaim $claim): void
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
 
         DB::transaction(function () use ($actor, $claim): void {
             $current = self::lock($claim);
@@ -130,12 +130,12 @@ class SupplierClaims
      *
      * @param  array<int, ClaimOutcomeDraft>  $outcomes  theo id dòng khiếu nại (SupplierClaimUnit)
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplierClaim
      */
     public function resolve(User $actor, SupplierClaim $claim, array $outcomes): void
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
 
         DB::transaction(function () use ($actor, $claim, $outcomes): void {
             $current = self::lock($claim);
@@ -173,12 +173,12 @@ class SupplierClaims
     /**
      * Nháp hoặc Đã gửi → Đã huỷ, kèm lý do. Đơn vị hàng quay lại danh sách Lỗi chưa khiếu nại.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplierClaim
      */
     public function cancel(User $actor, SupplierClaim $claim, string $reason): void
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
         $reason = trim($reason);
 
         if ($reason === '') {
@@ -253,7 +253,7 @@ class SupplierClaims
      */
     public function canEdit(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::Importer) && $claim->status === SupplierClaimStatus::Draft;
+        return $this->gate->allows($actor, Permission::SupplierClaim) && $claim->status === SupplierClaimStatus::Draft;
     }
 
     /**
@@ -269,7 +269,7 @@ class SupplierClaims
      */
     public function canResolve(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::Importer) && $claim->status === SupplierClaimStatus::Sent;
+        return $this->gate->allows($actor, Permission::SupplierClaim) && $claim->status === SupplierClaimStatus::Sent;
     }
 
     /**
@@ -277,7 +277,7 @@ class SupplierClaims
      */
     public function canCancel(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::Importer) && in_array($claim->status, SupplierClaimStatus::open(), true);
+        return $this->gate->allows($actor, Permission::SupplierClaim) && in_array($claim->status, SupplierClaimStatus::open(), true);
     }
 
     /**
@@ -286,7 +286,7 @@ class SupplierClaims
      */
     public function canImportReplacementGoods(User $actor, SupplierClaim $claim): bool
     {
-        return $this->roles->allows($actor, Role::Importer)
+        return $this->gate->allows($actor, Permission::SupplierClaim)
             && SupplierClaim::query()->acceptsReplacementGoods()->whereKey($claim->getKey())->exists();
     }
 

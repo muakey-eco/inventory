@@ -13,8 +13,8 @@ class SecurityLog
 {
     /**
      * @param  ?User  $user  nhân viên mà sự kiện nói tới
-     * @param  ?User  $actor  Quản trị thực hiện thao tác lên $user, nếu có
-     * @param  array<string, mixed>  $details  dữ liệu phụ không nhạy cảm, ví dụ Vai trò mới
+     * @param  ?User  $actor  nhân viên thực hiện thao tác lên $user, nếu có
+     * @param  array<string, mixed>  $details  dữ liệu phụ không nhạy cảm, ví dụ Quyền được thêm và bị bớt
      */
     public function record(
         SecurityEvent $event,

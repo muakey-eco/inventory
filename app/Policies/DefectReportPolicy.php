@@ -2,27 +2,27 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\DefectReport;
 use App\Models\User;
 
 /**
- * Báo lỗi: Quản trị và Bán hàng xem, tạo và xác minh; Nhập kho không thấy. Quy tắc thật nằm trong
+ * Báo lỗi: người có Quyền Báo lỗi và Đổi hàng xem, tạo và xác minh. Quy tắc thật nằm trong
  * DefectReporting. Báo lỗi chỉ tạo từ Phiếu xuất và không xoá.
  */
 class DefectReportPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Sale);
+        return $this->gate->allows($user, Permission::DefectReport);
     }
 
     public function view(User $user, DefectReport $defectReport): bool
     {
-        return $this->roles->allows($user, Role::Sale);
+        return $this->gate->allows($user, Permission::DefectReport);
     }
 
     public function create(User $user): bool

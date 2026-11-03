@@ -12,7 +12,7 @@ final readonly class DefectReportDraft
     /**
      * @param  string  $description  mô tả lỗi khách báo, bắt buộc
      * @param  ?UploadedFile  $screenshot  ảnh khách gửi; chỉ được lưu khi Báo lỗi tạo thành công
-     * @param  ?string  $overrideReason  lý do Quản trị vượt Hạn bảo hành
+     * @param  ?string  $overrideReason  lý do vượt Hạn bảo hành của người có Quyền Vượt hạn
      */
     public function __construct(
         public string $description,

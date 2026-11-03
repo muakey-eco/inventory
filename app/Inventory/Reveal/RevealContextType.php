@@ -8,7 +8,7 @@ namespace App\Inventory\Reveal;
  */
 enum RevealContextType: string
 {
-    /** Quản trị xem hàng Còn hàng kèm lý do tự do; không có bản ghi ngữ cảnh. */
+    /** Người có Quyền Xem hàng Còn hàng xem kèm lý do tự do; không có bản ghi ngữ cảnh. */
     case InStock = 'in-stock';
 
     /** Tải dòng bị bỏ khi nhập của một Lô nhập. */
@@ -23,13 +23,13 @@ enum RevealContextType: string
     /** Màn kết quả ngay sau khi Đổi hàng. */
     case Replacement = 'replacement';
 
-    /** Nhập kho xem Đơn vị hàng trong Khiếu nại nhà cung cấp để gửi bằng chứng. */
+    /** Người có Quyền Khiếu nại nhà cung cấp xem Đơn vị hàng trong khiếu nại để gửi bằng chứng. */
     case SupplierClaim = 'supplier-claim';
 
     public function label(): string
     {
         return match ($this) {
-            self::InStock => 'Quản trị xem hàng Còn hàng',
+            self::InStock => 'Xem hàng Còn hàng',
             self::Batch => 'Lô nhập',
             self::Delivery => 'Giao hàng',
             self::DefectReport => 'Báo lỗi',

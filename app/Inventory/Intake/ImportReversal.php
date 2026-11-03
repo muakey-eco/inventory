@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Intake;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Stock\SlotStatus;
 use App\Inventory\Stock\StockLedger;
 use App\Inventory\Stock\StockTransition;
@@ -14,7 +15,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Huỷ nhập: Quản trị rút lại hàng nhập nhầm theo Dòng nhập hoặc cả Lô nhập, coi như chưa từng
+ * Huỷ nhập: người có Quyền Huỷ nhập rút lại hàng nhập nhầm theo Dòng nhập hoặc cả Lô nhập, coi như chưa từng
  * vào kho. Chỉ Đơn vị hàng Hoạt động mà mọi Slot còn Còn hàng bị Huỷ nhập; phần còn lại ở lại.
  * Đơn vị hàng bị Huỷ nhập nhả Khoá chống trùng để nhập lại được đúng mã, nhưng bản ghi được giữ
  * và mỗi lần chuyển trạng thái ghi Sổ biến động kho. Không phải Huỷ hàng, không tính tổn thất.
@@ -29,18 +30,18 @@ class ImportReversal
     private const REVERSIBLE = 'stock_units.status = ? AND NOT EXISTS (SELECT 1 FROM slots WHERE slots.stock_unit_id = stock_units.id AND slots.status <> ?)';
 
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private StockLedger $ledger,
     ) {}
 
     /**
      * Số lượng sẽ Huỷ nhập và giữ lại nếu làm lúc này, cho màn xác nhận.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function plan(User $actor, Batch|BatchLine $target): ReversalPlan
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::IntakeReverse);
 
         return self::tally(self::lineIds($target));
     }
@@ -49,12 +50,12 @@ class ImportReversal
      * @param  ?string  $reason  lý do tự do, ghi kèm vào Sổ biến động kho
      * @return ReversalPlan số thực đã Huỷ nhập và giữ lại
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidBatch
      */
     public function reverse(User $actor, Batch|BatchLine $target, ?string $reason = null): ReversalPlan
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::IntakeReverse);
 
         // Deadlock với Lô nhập đang ghi hoặc Huỷ nhập khác đụng cùng Tài khoản cũ: chạy lại.
         return DB::transaction(function () use ($actor, $target, $reason): ReversalPlan {

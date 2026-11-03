@@ -1,7 +1,8 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Filament\Resources\DefectReports\Pages\ViewDefectReport;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\ProductCatalog;
@@ -49,14 +50,15 @@ use App\Models\StockLedgerEntry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->reports = app(DefectReporting::class);
     $this->replacements = app(ReplacementDelivery::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -293,7 +295,7 @@ it('chuỗi Đổi hàng luôn trỏ về lần giao gốc và kế thừa Hạn
 
     expect($this->replacements->canRequestApproval($this->seller, $firstReport))->toBeFalse()
         ->and(fn () => $this->replacements->requestApproval($this->seller, $firstReport))
-        ->toThrow(InvalidReplacement::class, 'Chỉ từ lần đổi thứ 3 trong chuỗi mới cần Quản trị duyệt.');
+        ->toThrow(InvalidReplacement::class, 'Chỉ từ lần đổi thứ 3 trong chuỗi mới cần duyệt.');
 
     $first = $this->replacements->replace($this->seller, $firstReport, new ReplacementDraft);
     $this->travel(2)->days();
@@ -308,7 +310,7 @@ it('chuỗi Đổi hàng luôn trỏ về lần giao gốc và kế thừa Hạn
         ->and($this->replacements->canReplace($this->admin, $third))->toBeTrue()
         ->and($this->replacements->canRequestApproval($this->admin, $third))->toBeFalse()
         ->and(fn () => $this->replacements->replace($this->seller, $third, new ReplacementDraft))
-        ->toThrow(InvalidReplacement::class, 'Lần đổi thứ 3 trong chuỗi cần Quản trị duyệt.');
+        ->toThrow(InvalidReplacement::class, 'Lần đổi thứ 3 trong chuỗi cần người có Quyền Duyệt Đổi hàng duyệt.');
 
     $this->travel(1)->hours();
     $this->replacements->requestApproval($this->seller, $third);
@@ -318,8 +320,8 @@ it('chuỗi Đổi hàng luôn trỏ về lần giao gốc và kế thừa Hạn
         ->replacement_approval_requested_at->toEqual(now()->toImmutable())
         ->and(DefectReport::awaitingApproval()->pluck('id')->all())->toBe([$third->id])
         ->and($this->replacements->canRequestApproval($this->seller, $third->fresh()))->toBeFalse()
-        ->and(fn () => $this->replacements->requestApproval($this->seller, $third))->toThrow(InvalidReplacement::class, 'Đã yêu cầu Quản trị duyệt Đổi hàng.')
-        ->and(fn () => $this->replacements->approve($this->seller, $third))->toThrow(MissingRole::class)
+        ->and(fn () => $this->replacements->requestApproval($this->seller, $third))->toThrow(InvalidReplacement::class, 'Đã xin duyệt Đổi hàng.')
+        ->and(fn () => $this->replacements->approve($this->seller, $third))->toThrow(MissingPermission::class)
         ->and($this->replacements->canApprove($this->seller, $third->fresh()))->toBeFalse()
         ->and($this->replacements->canApprove($this->admin, $third->fresh()))->toBeTrue();
 
@@ -328,7 +330,7 @@ it('chuỗi Đổi hàng luôn trỏ về lần giao gốc và kế thừa Hạn
     expect($third->fresh()->replacement_approved_by)->toBe($this->admin->id)
         ->and(DefectReport::awaitingApproval()->count())->toBe(0)
         ->and($this->replacements->canReplace($this->seller, $third->fresh()))->toBeTrue()
-        ->and(fn () => $this->replacements->approve($this->admin, $third))->toThrow(InvalidReplacement::class, 'Đổi hàng đã được Quản trị duyệt.');
+        ->and(fn () => $this->replacements->approve($this->admin, $third))->toThrow(InvalidReplacement::class, 'Đổi hàng đã được duyệt.');
 
     $approved = $this->replacements->replace($this->seller, $third->fresh(), new ReplacementDraft);
 
@@ -339,6 +341,31 @@ it('chuỗi Đổi hàng luôn trỏ về lần giao gốc và kế thừa Hạn
     $byAdmin = $this->replacements->replace($this->admin, confirmedDefect($approved->delivery), new ReplacementDraft);
 
     expect([$byAdmin->sequence, $byAdmin->approved_by])->toBe([4, $this->admin->id]);
+});
+
+it('từ lần đổi thứ 3, người có Báo lỗi mà không có Duyệt Đổi hàng phải xin duyệt; người có Duyệt Đổi hàng đổi thẳng và không thấy nút Xin duyệt', function () {
+    replacementStock($this->steam, "SR1\tA-1\nSR2\tA-2\nSR3\tA-3\nSR4\tA-4");
+    $first = $this->replacements->replace($this->seller, confirmedDefect(replacementOrder('SP-001', $this->steam)->deliveries()->firstOrFail()), new ReplacementDraft);
+    $second = $this->replacements->replace($this->seller, confirmedDefect($first->delivery), new ReplacementDraft);
+    $third = confirmedDefect($second->delivery);
+    $clerk = staffMember(Permission::DefectReport);
+    $approver = staffMember(Permission::DefectReport, Permission::ReplacementApprove);
+
+    expect($this->replacements->canReplace($clerk, $third))->toBeFalse()
+        ->and($this->replacements->canRequestApproval($clerk, $third))->toBeTrue()
+        ->and(fn () => $this->replacements->replace($clerk, $third, new ReplacementDraft))->toThrow(InvalidReplacement::class)
+        ->and($this->replacements->canReplace($approver, $third))->toBeTrue()
+        ->and($this->replacements->canRequestApproval($approver, $third))->toBeFalse();
+
+    $this->actingAs($clerk);
+    Livewire::test(ViewDefectReport::class, ['record' => $third->getRouteKey()])->assertActionVisible('requestReplacementApproval');
+
+    $this->actingAs($approver);
+    Livewire::test(ViewDefectReport::class, ['record' => $third->getRouteKey()])->assertActionHidden('requestReplacementApproval');
+
+    $replacement = $this->replacements->replace($approver, $third, new ReplacementDraft);
+
+    expect([$replacement->sequence, $replacement->approved_by])->toBe([3, $approver->id]);
 });
 
 it('màn kết quả Đổi hàng ghi Nhật ký xem mã ngữ cảnh Đổi hàng, chỉ người vừa Đổi hàng và chỉ một lần', function () {
@@ -402,7 +429,7 @@ it('Đổi hàng không được và không đổi gì', function (Closure $arra
 
         return [test()->seller, confirmedDefect($broken), new ReplacementDraft(test()->netflix, productChangeReason: 'Hết Steam')];
     }, InvalidDispatch::class, 'Sản phẩm "Netflix 1 tháng" đã Ngừng bán.'],
-    'Nhập kho' => [fn (Delivery $broken) => [staffMember(Role::Importer), confirmedDefect($broken), new ReplacementDraft], MissingRole::class, ''],
+    'Nhập kho' => [fn (Delivery $broken) => [staffInRole('importer'), confirmedDefect($broken), new ReplacementDraft], MissingPermission::class, ''],
 ]);
 
 it('Đơn vị hàng lỗi Phạm vi cả Đơn vị hàng không bị chọn lại khi Đổi hàng', function () {

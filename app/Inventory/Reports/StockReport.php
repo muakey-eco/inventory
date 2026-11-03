@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Reports;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Intake\BatchStatus;
 use App\Inventory\Stock\SellableStock;
 use App\Inventory\Stock\SlotStatus;
@@ -25,8 +25,8 @@ use Illuminate\Support\Facades\DB;
  * vốn riêng. Lọc theo Nhà cung cấp chỉ đổi số đếm; Sắp hết luôn xét Tồn bán được của cả Sản phẩm, vì
  * Ngưỡng sắp hết là của Sản phẩm.
  *
- * Cả ba Vai trò xem được; Bán hàng không thấy giá trị Giá vốn và không lọc theo Nhà cung cấp. Xem hay
- * xuất báo cáo không ghi nhật ký.
+ * Cần Quyền Xem hàng và báo cáo tồn; thiếu Quyền Xem giá vốn và Nhà cung cấp thì không thấy giá trị
+ * Giá vốn và không lọc theo Nhà cung cấp. Xem hay xuất báo cáo không ghi nhật ký.
  */
 class StockReport
 {
@@ -37,11 +37,11 @@ class StockReport
 
     private const DEFECTIVE = 'COALESCE(stock.defective_slots, 0) > 0';
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     /**
@@ -49,7 +49,7 @@ class StockReport
      */
     public function seesCost(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::CostView);
     }
 
     /**
@@ -58,14 +58,14 @@ class StockReport
      *
      * @return Builder<Product>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function query(User $actor, StockReportFilter $filter): Builder
     {
-        $this->roles->authorize($actor, Role::Importer, Role::Sale);
+        $this->gate->authorize($actor, Permission::StockView);
 
         if ($filter->supplierId !== null) {
-            $this->roles->authorize($actor, Role::Importer);
+            $this->gate->authorize($actor, Permission::CostView);
         }
 
         $today = CarbonImmutable::today();
@@ -101,7 +101,7 @@ class StockReport
     /**
      * @return list<StockReportRow> theo tên Sản phẩm
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rows(User $actor, StockReportFilter $filter): array
     {
@@ -117,7 +117,7 @@ class StockReport
      * Tổng của cả báo cáo, cho ô số trên trang Tổng quan. Đi qua đúng {@see query()} mà bảng đang
      * dùng, nên ô số và bảng không bao giờ nói hai con số khác nhau.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function totals(User $actor, StockReportFilter $filter): StockReportTotals
     {
@@ -136,7 +136,7 @@ class StockReport
     }
 
     /**
-     * Cột báo cáo theo Vai trò người xem: khoá → tiêu đề.
+     * Cột báo cáo theo Quyền người xem: khoá → tiêu đề.
      *
      * @return array<string, string>
      */
@@ -165,9 +165,9 @@ class StockReport
     }
 
     /**
-     * File báo cáo, cột theo Vai trò người tải. Không ghi nhật ký.
+     * File báo cáo, cột theo Quyền người tải. Không ghi nhật ký.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function export(User $actor, StockReportFilter $filter, ReportFormat $format): ReportExport
     {

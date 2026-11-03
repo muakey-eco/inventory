@@ -5,7 +5,8 @@ namespace App\Filament\Resources\DefectReports\Pages;
 use App\Filament\Resources\DefectReports\DefectReportResource;
 use App\Filament\Resources\Dispatches\DispatchResource;
 use App\Filament\Support\InventoryAction;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Inventory\Dispatch\DeliveryTemplate;
 use App\Inventory\Reveal\ContentReveal;
@@ -37,8 +38,8 @@ use Illuminate\Support\HtmlString;
  * Trang xác minh Báo lỗi: Xem mã (ghi Nhật ký xem mã ngữ cảnh Báo lỗi), Xác nhận với Phạm vi lỗi
  * hoặc Bác bỏ, kèm ghi chú. Đơn vị hàng chuyển Lỗi thì liệt kê Lần giao bị ảnh hưởng và cho tạo Báo
  * lỗi hàng loạt tự Xác nhận. Báo lỗi Chờ đổi thì Đổi hàng (gọi ReplacementDelivery, rồi hiện mã
- * lần giao mới qua màn kết quả Đổi hàng) hoặc Không đổi; từ lần đổi thứ 3 Bán hàng yêu cầu và Quản
- * trị duyệt ở đây. Nội dung chỉ nằm trong tham số của modal vừa mở.
+ * lần giao mới qua màn kết quả Đổi hàng) hoặc Không đổi; từ lần đổi thứ 3 thì xin duyệt và duyệt ở
+ * đây. Nội dung chỉ nằm trong tham số của modal vừa mở.
  */
 class ViewDefectReport extends ViewRecord
 {
@@ -128,7 +129,7 @@ class ViewDefectReport extends ViewRecord
                 ->modalSubmitActionLabel('Đổi hàng')
                 ->fillForm(fn (): array => ['product_id' => $this->reportRecord()->stockUnit->product_id, 'accept_shorter_expiry' => false])
                 ->schema(fn (): array => $this->replacementSchema())
-                // Bán hàng vẫn mở được modal ở lần đổi cần duyệt để thấy cảnh báo; nút gửi bị khoá tới khi Quản trị duyệt.
+                // Người chưa được duyệt vẫn mở được modal ở lần đổi cần duyệt để thấy cảnh báo; nút gửi bị khoá tới khi được duyệt.
                 ->visible(fn (DefectReporting $reports): bool => $reports->canDeclineReplacement(InventoryAction::actor(), $this->reportRecord()))
                 ->modalSubmitAction(fn (Action $submit): Action => $submit->disabled(! app(ReplacementDelivery::class)->canReplace(InventoryAction::actor(), $this->reportRecord())))
                 ->action(function (Action $action, array $data, ReplacementDelivery $replacements, ContentReveal $reveal): void {
@@ -149,19 +150,19 @@ class ViewDefectReport extends ViewRecord
                     ]);
                 }),
             Action::make('requestReplacementApproval')
-                ->label('Yêu cầu Quản trị duyệt')
+                ->label('Xin duyệt')
                 ->icon(Heroicon::OutlinedHandRaised)
                 ->color('warning')
                 ->requiresConfirmation()
-                ->modalHeading('Yêu cầu Quản trị duyệt Đổi hàng')
-                ->modalDescription('Từ lần đổi thứ '.ReplacementDelivery::APPROVAL_SEQUENCE.' trong chuỗi, Đổi hàng cần Quản trị duyệt. Báo lỗi vào danh sách Chờ Quản trị duyệt.')
+                ->modalHeading('Xin duyệt Đổi hàng')
+                ->modalDescription('Từ lần đổi thứ '.ReplacementDelivery::APPROVAL_SEQUENCE.' trong chuỗi, Đổi hàng cần người có Quyền Duyệt Đổi hàng duyệt. Báo lỗi vào danh sách Chờ duyệt.')
                 ->modalSubmitActionLabel('Gửi yêu cầu')
                 ->visible(fn (ReplacementDelivery $replacements): bool => $replacements->canRequestApproval(InventoryAction::actor(), $this->reportRecord()))
                 ->action(function (Action $action, ReplacementDelivery $replacements): void {
                     InventoryAction::attempt($action, fn () => $replacements->requestApproval(InventoryAction::actor(), $this->reportRecord()));
                     $this->reportRecord()->refresh();
 
-                    Notification::make()->success()->title('Đã yêu cầu Quản trị duyệt Đổi hàng.')->send();
+                    Notification::make()->success()->title('Đã xin duyệt Đổi hàng.')->send();
                 }),
             Action::make('approveReplacement')
                 ->label('Duyệt Đổi hàng')
@@ -169,7 +170,7 @@ class ViewDefectReport extends ViewRecord
                 ->color('success')
                 ->requiresConfirmation()
                 ->modalHeading('Duyệt Đổi hàng')
-                ->modalDescription('Cho Bán hàng Đổi hàng lần này dù đã từ lần đổi thứ '.ReplacementDelivery::APPROVAL_SEQUENCE.' trong chuỗi.')
+                ->modalDescription('Cho Đổi hàng lần này dù đã từ lần đổi thứ '.ReplacementDelivery::APPROVAL_SEQUENCE.' trong chuỗi.')
                 ->modalSubmitActionLabel('Duyệt')
                 ->visible(fn (ReplacementDelivery $replacements): bool => $replacements->canApprove(InventoryAction::actor(), $this->reportRecord()))
                 ->action(function (Action $action, ReplacementDelivery $replacements): void {
@@ -300,8 +301,8 @@ class ViewDefectReport extends ViewRecord
         };
         $approval = match (true) {
             ! $preview->requiresApproval => '',
-            $report->replacement_approved_at !== null => ' Quản trị đã duyệt lần đổi này.',
-            default => ' <strong>Cảnh báo:</strong> từ lần đổi thứ '.ReplacementDelivery::APPROVAL_SEQUENCE.' cần Quản trị duyệt.',
+            $report->replacement_approved_at !== null => ' Lần đổi này đã được duyệt.',
+            default => ' <strong>Cảnh báo:</strong> từ lần đổi thứ '.ReplacementDelivery::APPROVAL_SEQUENCE.' cần người có Quyền Duyệt Đổi hàng duyệt.',
         };
 
         return new HtmlString(sprintf(
@@ -316,8 +317,8 @@ class ViewDefectReport extends ViewRecord
     }
 
     /**
-     * Form Báo lỗi hàng loạt: chọn Lần giao bị ảnh hưởng; Quản trị nhập lý do khi có lần giao ngoài
-     * Hạn bảo hành.
+     * Form Báo lỗi hàng loạt: chọn Lần giao bị ảnh hưởng; người có Quyền Vượt hạn nhập lý do khi có
+     * lần giao ngoài Hạn bảo hành.
      *
      * @param  list<AffectedDelivery>  $affected
      * @return list<mixed>
@@ -336,8 +337,7 @@ class ViewDefectReport extends ViewRecord
                 ->label('Lý do vượt Hạn bảo hành')
                 ->helperText('Chỉ lưu cho lần giao ngoài Hạn bảo hành.')
                 ->rows(2)
-                // Không truyền Vai trò nào: chỉ Quản trị vượt Hạn bảo hành.
-                ->visible(app(RoleGate::class)->allows(InventoryAction::actor())),
+                ->visible(app(PermissionGate::class)->allows(InventoryAction::actor(), Permission::DeadlineOverride)),
         ];
     }
 

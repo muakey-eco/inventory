@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Api\ApiKeys;
 use App\Inventory\Api\InvalidApiKey;
 use App\Inventory\Dispatch\SalesChannelDirectory;
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function () {
     $this->keys = app(ApiKeys::class);
     $this->channels = app(SalesChannelDirectory::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->website = $this->channels->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api, requiresExternalRef: true));
 });
 
@@ -33,18 +32,18 @@ it('Quản trị tạo Khoá API: bí mật hiện một lần, kho chỉ lưu h
         ->and($this->keys->authenticate($issued->secret.'x'))->toBeNull();
 });
 
-it('chỉ Quản trị tạo, thu hồi và xoay Khoá API', function (Role $role) {
-    $staff = staffMember($role);
+it('chỉ Quản trị tạo, thu hồi và xoay Khoá API', function (string $role) {
+    $staff = staffInRole($role);
     $issued = $this->keys->issue($this->admin, $this->website);
 
-    expect(fn () => $this->keys->issue($staff, $this->website))->toThrow(MissingRole::class)
-        ->and(fn () => $this->keys->rotate($staff, $issued->key))->toThrow(MissingRole::class)
-        ->and(fn () => $this->keys->revoke($staff, $issued->key))->toThrow(MissingRole::class)
+    expect(fn () => $this->keys->issue($staff, $this->website))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->keys->rotate($staff, $issued->key))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->keys->revoke($staff, $issued->key))->toThrow(MissingPermission::class)
         ->and(ApiKey::count())->toBe(1)
         ->and($issued->key->fresh()->isRevoked())->toBeFalse();
 })->with([
-    'Nhập kho' => [Role::Importer],
-    'Bán hàng' => [Role::Sale],
+    'Nhập kho' => ['importer'],
+    'Bán hàng' => ['sale'],
 ]);
 
 it('chỉ Kênh bán loại API mới có Khoá API', function () {

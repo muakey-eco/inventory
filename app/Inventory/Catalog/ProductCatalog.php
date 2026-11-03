@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Catalog;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\DeliveryTemplate;
 use App\Models\BatchLine;
 use App\Models\Product;
@@ -13,7 +13,8 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Danh mục Sản phẩm: chỉ Quản trị tạo, sửa, Ngừng bán, xoá. Trường nội dung, Dạng hàng và
+ * Danh mục Sản phẩm: chỉ người có Quyền Quản lý Sản phẩm và Loại sản phẩm tạo, sửa, Ngừng bán,
+ * xoá. Trường nội dung, Dạng hàng và
  * chuẩn hoá Khoá chống trùng thuộc Loại sản phẩm ({@see ProductTypeCatalog}), không ở đây;
  * Sản phẩm chỉ lệch khỏi Loại đúng một chỗ là Mẫu giao hàng (ADR 0004).
  */
@@ -29,15 +30,15 @@ class ProductCatalog
 
     private const CODE_FORMAT = '/^[A-Z0-9][A-Z0-9._-]*$/';
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidProductConfiguration
      */
     public function create(User $actor, ProductDraft $draft): Product
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
         self::validate($draft);
 
         return self::guardCode($draft, fn (): Product => DB::transaction(
@@ -46,13 +47,13 @@ class ProductCatalog
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidProductConfiguration
      * @throws LockedProductConfiguration
      */
     public function update(User $actor, Product $product, ProductDraft $draft): Product
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
 
         return self::guardCode($draft, fn (): Product => DB::transaction(function () use ($product, $draft): Product {
             $current = Product::query()->lockForUpdate()->findOrFail($product->getKey());
@@ -78,11 +79,11 @@ class ProductCatalog
     /**
      * Không Giữ hàng hay Giao hàng mới cho Sản phẩm; Đổi hàng của lần giao cũ vẫn dùng được.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function discontinue(User $actor, Product $product): void
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
 
         $product->forceFill(['discontinued_at' => $product->discontinued_at ?? now()])->save();
     }
@@ -90,12 +91,12 @@ class ProductCatalog
     /**
      * Chỉ xoá được Sản phẩm chưa từng có hàng (khai báo nhầm).
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws ProductHasStock
      */
     public function delete(User $actor, Product $product): void
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
 
         DB::transaction(function () use ($product): void {
             $current = Product::query()->lockForUpdate()->findOrFail($product->getKey());
@@ -130,7 +131,7 @@ class ProductCatalog
     }
 
     /**
-     * Hai Quản trị cùng đặt một Mã sản phẩm: kiểm tra trước chỉ bắt được trường hợp
+     * Hai người cùng đặt một Mã sản phẩm: kiểm tra trước chỉ bắt được trường hợp
      * tuần tự, unique index bắt nốt trường hợp đồng thời.
      *
      * @template T

@@ -5,7 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Support\NavGroup;
 use App\Http\Middleware\EndIdleAppSession;
-use App\Http\Middleware\SyncRoleSnapshot;
+use App\Http\Middleware\SyncPermissionSnapshot;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
@@ -65,7 +65,7 @@ class AdminPanelProvider extends PanelProvider
             // request Livewire update.
             ->authMiddleware([
                 EndIdleAppSession::class,
-                SyncRoleSnapshot::class,
+                SyncPermissionSnapshot::class,
             ], isPersistent: true);
     }
 }

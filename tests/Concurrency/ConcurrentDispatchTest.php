@@ -1,6 +1,5 @@
 <?php
 
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Catalog\SupplierDirectory;
@@ -33,8 +32,8 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->channel = app(SalesChannelDirectory::class)->create($admin, new SalesChannelDraft('Zalo'));
     $this->product = productOf(
         StockForm::OneTimeCode,

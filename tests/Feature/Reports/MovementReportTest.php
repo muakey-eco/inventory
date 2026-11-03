@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -50,9 +49,9 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
     $this->report = app(MovementReport::class);
 
     $this->netflix = productOf(
@@ -316,10 +315,10 @@ it('cả ba vai trò xem được; Bán hàng chỉ thấy số lượng, không
             CarbonImmutable::parse('2026-09-01'),
             CarbonImmutable::parse('2026-09-30'),
             supplierId: $this->g2a->id,
-        )))->toThrow(MissingRole::class);
+        )))->toThrow(MissingPermission::class);
 
     $this->seller->forceFill(['deactivated_at' => now()])->save();
-    expect(fn () => $this->report->rows($this->seller, septemberRange()))->toThrow(MissingRole::class);
+    expect(fn () => $this->report->rows($this->seller, septemberRange()))->toThrow(MissingPermission::class);
 });
 
 it('xuất CSV áp cột theo vai trò, không ghi Nhật ký xem mã hay Nhật ký bảo mật', function () {

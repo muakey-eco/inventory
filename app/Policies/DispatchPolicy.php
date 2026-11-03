@@ -2,37 +2,37 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\Dispatch;
 use App\Models\User;
 
 /**
- * Phiếu xuất: Quản trị và Bán hàng tạo, xem và sửa phiếu Hoàn tất; Nhập kho không thấy. Quy tắc
+ * Phiếu xuất: người có Quyền Xuất hàng tạo, xem và sửa phiếu Hoàn tất. Quy tắc
  * thật nằm trong ManualDispatch và DispatchEditor. Phiếu xuất không xoá.
  */
 class DispatchPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Sale);
+        return $this->gate->allows($user, Permission::Dispatch);
     }
 
     public function view(User $user, Dispatch $dispatch): bool
     {
-        return $this->roles->allows($user, Role::Sale);
+        return $this->gate->allows($user, Permission::Dispatch);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Sale);
+        return $this->gate->allows($user, Permission::Dispatch);
     }
 
     public function update(User $user, Dispatch $dispatch): bool
     {
-        return $this->roles->allows($user, Role::Sale);
+        return $this->gate->allows($user, Permission::Dispatch);
     }
 
     public function delete(User $user, Dispatch $dispatch): bool

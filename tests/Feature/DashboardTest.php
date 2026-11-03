@@ -13,7 +13,7 @@ use App\Filament\Widgets\OutboundQueue;
 use App\Filament\Widgets\OwnerQueue;
 use App\Filament\Widgets\StockAlerts;
 use App\Filament\Widgets\StockSummary;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\Permission;
 use App\Inventory\Api\ApiKeys;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
@@ -56,9 +56,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-16 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
 
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $channels = app(SalesChannelDirectory::class);
@@ -95,8 +95,8 @@ function dashboardStats(string $widget): array
     return collect($stats)->mapWithKeys(fn (Stat $stat): array => [(string) $stat->getLabel() => $stat])->all();
 }
 
-it('mỗi Vai trò thấy đúng widget của công việc mình làm, số ô không đổi theo người xem', function (?Role $role, array $visible) {
-    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
+it('mỗi Vai trò thấy đúng widget của công việc mình làm, số ô không đổi theo người xem', function (?string $role, array $visible) {
+    $this->actingAs($role === null ? User::factory()->create() : staffInRole($role));
 
     $this->get(Dashboard::getUrl())->assertOk();
 
@@ -115,9 +115,9 @@ it('mỗi Vai trò thấy đúng widget của công việc mình làm, số ô k
         }
     }
 })->with([
-    'Quản trị' => [Role::Admin, [OutboundQueue::class, IntakeQueue::class, StockSummary::class, OwnerQueue::class]],
-    'Nhập kho' => [Role::Importer, [IntakeQueue::class, StockSummary::class]],
-    'Bán hàng' => [Role::Sale, [OutboundQueue::class, StockSummary::class]],
+    'Quản trị' => ['admin', [OutboundQueue::class, IntakeQueue::class, StockSummary::class, OwnerQueue::class]],
+    'Nhập kho' => ['importer', [IntakeQueue::class, StockSummary::class]],
+    'Bán hàng' => ['sale', [OutboundQueue::class, StockSummary::class]],
     'không vai trò' => [null, []],
 ]);
 
@@ -281,7 +281,7 @@ it('kho rỗng thì ô Tồn bán được báo động chứ không mừng', fu
         ->and($stats['Sản phẩm sắp hết']->getColor())->toBe('warning');
 });
 
-it('widget Quản trị đếm Đổi hàng chờ duyệt và nói kho đang dừng hay đang chạy', function () {
+it('widget Việc chờ xử lý đếm Đổi hàng chờ duyệt và nói kho đang dừng hay đang chạy', function () {
     stockUp($this->netflix, "a@shop.test\tpw-a\nb@shop.test\tpw-b");
 
     app(ManualDispatch::class)->create($this->seller, new DispatchDraft($this->zalo, null, [new DispatchLineDraft($this->netflix, 1)]));
@@ -311,4 +311,25 @@ it('widget Quản trị đếm Đổi hàng chờ duyệt và nói kho đang d�
     expect($frozen->getValue())->toBe('Đang tạm dừng')
         ->and($frozen->getColor())->toBe('danger')
         ->and($frozen->getDescription())->toBe('Khôi phục từ backup');
+});
+
+it('widget Việc chờ xử lý hiện từng ô theo Quyền của nó, không có ô nào thì ẩn', function (array $permissions, array $tiles) {
+    $this->actingAs(staffMember(...$permissions));
+
+    expect(OwnerQueue::canView())->toBe($tiles !== []);
+
+    if ($tiles !== []) {
+        expect(array_keys(dashboardStats(OwnerQueue::class)))->toBe($tiles);
+    }
+})->with([
+    'Duyệt Đổi hàng' => [[Permission::ReplacementApprove], ['Đổi hàng chờ duyệt']],
+    'Tạm dừng xuất kho' => [[Permission::DispatchFreeze], ['Tạm dừng xuất kho']],
+    'cả hai' => [[Permission::ReplacementApprove, Permission::DispatchFreeze], ['Đổi hàng chờ duyệt', 'Tạm dừng xuất kho']],
+    'Quyền khác' => [[Permission::StaffManage, Permission::ReportProfit], []],
+]);
+
+it('widget Việc chờ xử lý mang tiêu đề mới', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(OwnerQueue::class)->assertSee('Việc chờ xử lý');
 });

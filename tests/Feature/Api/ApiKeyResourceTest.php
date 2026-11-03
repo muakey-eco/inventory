@@ -2,7 +2,6 @@
 
 use App\Filament\Resources\ApiKeys\ApiKeyResource;
 use App\Filament\Resources\ApiKeys\Pages\ManageApiKeys;
-use App\Inventory\Access\Role;
 use App\Inventory\Api\ApiKeys;
 use App\Inventory\Dispatch\SalesChannelDirectory;
 use App\Inventory\Dispatch\SalesChannelDraft;
@@ -12,18 +11,18 @@ use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->website = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api));
 });
 
-it('chỉ Quản trị mở được trang Khoá API', function (Role $role, int $status) {
-    $this->actingAs(staffMember($role))
+it('chỉ Quản trị mở được trang Khoá API', function (string $role, int $status) {
+    $this->actingAs(staffInRole($role))
         ->get(ApiKeyResource::getUrl('index'))
         ->assertStatus($status);
 })->with([
-    'Quản trị' => [Role::Admin, 200],
-    'Nhập kho' => [Role::Importer, 403],
-    'Bán hàng' => [Role::Sale, 403],
+    'Quản trị' => ['admin', 200],
+    'Nhập kho' => ['importer', 403],
+    'Bán hàng' => ['sale', 403],
 ]);
 
 it('trang Khoá API hiện khoá theo Kênh bán mà không hiện giá trị khoá', function () {

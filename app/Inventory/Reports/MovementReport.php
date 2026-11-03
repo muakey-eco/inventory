@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Reports;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\DispatchLineKind;
 use App\Inventory\Intake\BatchStatus;
 use App\Inventory\Stock\StockUnitStatus;
@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\DB;
  * con số của một kỳ cũ giảm đi sau khi Huỷ nhập. Xuất tính theo thời điểm Giao hàng, bỏ qua lần
  * giao đã bị Giao thay vì Slot đó đã Huỷ hàng và khách nhận Slot khác.
  *
- * Cả ba Vai trò xem được; Bán hàng không thấy Giá vốn, Giá bán và không lọc theo Nhà cung cấp. Xem
- * hay xuất báo cáo không ghi nhật ký.
+ * Cần Quyền Xem hàng và báo cáo tồn; thiếu Quyền Xem giá vốn và Nhà cung cấp thì không thấy Giá
+ * vốn, Giá bán và không lọc theo Nhà cung cấp. Xem hay xuất báo cáo không ghi nhật ký.
  */
 class MovementReport
 {
@@ -43,11 +43,11 @@ class MovementReport
         'defective_slots' => 'losses',
     ];
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     /**
@@ -55,7 +55,7 @@ class MovementReport
      */
     public function seesValues(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::CostView);
     }
 
     /**
@@ -63,14 +63,14 @@ class MovementReport
      *
      * @return Builder<Product>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function query(User $actor, MovementReportFilter $filter): Builder
     {
-        $this->roles->authorize($actor, Role::Importer, Role::Sale);
+        $this->gate->authorize($actor, Permission::StockView);
 
         if ($filter->supplierId !== null) {
-            $this->roles->authorize($actor, Role::Importer);
+            $this->gate->authorize($actor, Permission::CostView);
         }
 
         $sources = self::sources($filter);
@@ -99,7 +99,7 @@ class MovementReport
     /**
      * @return list<MovementReportRow> theo tên Sản phẩm
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rows(User $actor, MovementReportFilter $filter): array
     {
@@ -112,7 +112,7 @@ class MovementReport
     }
 
     /**
-     * Cột báo cáo theo Vai trò người xem và theo bộ lọc đang áp: khoá → tiêu đề. Là chỗ duy nhất
+     * Cột báo cáo theo Quyền người xem và theo bộ lọc đang áp: khoá → tiêu đề. Là chỗ duy nhất
      * quyết định cột nào hiện; panel hỏi vào đây chứ không tự suy lại.
      *
      * @return array<string, string>
@@ -138,9 +138,9 @@ class MovementReport
     }
 
     /**
-     * File báo cáo, cột theo Vai trò người tải và theo bộ lọc đang áp. Không ghi nhật ký.
+     * File báo cáo, cột theo Quyền người tải và theo bộ lọc đang áp. Không ghi nhật ký.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function export(User $actor, MovementReportFilter $filter, ReportFormat $format): ReportExport
     {

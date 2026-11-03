@@ -18,7 +18,7 @@ final readonly class MovementReportFilter
      * @param  CarbonImmutable  $from  ngày đầu khoảng, tính cả ngày này
      * @param  CarbonImmutable  $to  ngày cuối khoảng, tính cả ngày này
      * @param  list<int>  $productIds  rỗng thì mọi Sản phẩm
-     * @param  ?int  $supplierId  chỉ đếm hàng của Nhà cung cấp này; chỉ Quản trị và Nhập kho
+     * @param  ?int  $supplierId  chỉ đếm hàng của Nhà cung cấp này; chỉ khi có Quyền Xem giá vốn và Nhà cung cấp
      * @param  ?int  $salesChannelId  chỉ đếm hàng giao qua Kênh bán này
      */
     public function __construct(

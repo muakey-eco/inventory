@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -35,8 +34,8 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->report = app(DispatchProfitReport::class);
 
     $this->netflix = productOf(
@@ -163,5 +162,5 @@ it('lọc Kênh bán chỉ còn phiếu của kênh đó', function () {
 it('chỉ Quản trị xem được chi tiết theo Phiếu xuất', function () {
     expect($this->report->canView($this->admin))->toBeTrue()
         ->and($this->report->canView($this->seller))->toBeFalse()
-        ->and(fn () => $this->report->rows($this->seller, dispatchProfitSeptember()))->toThrow(MissingRole::class);
+        ->and(fn () => $this->report->rows($this->seller, dispatchProfitSeptember()))->toThrow(MissingPermission::class);
 });

@@ -4,7 +4,6 @@ use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\ProductResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ProductCatalog;
 use App\Inventory\Catalog\ProductTypeCatalog;
@@ -47,8 +46,8 @@ function steamWalletProduct(bool $stocked = false): Product
     return $stocked ? withStock($product) : $product;
 }
 
-it('mọi Vai trò xem được danh sách Sản phẩm, chỉ Quản trị vào được trang Tạo', function (Role $role, bool $canCreate) {
-    $this->actingAs(staffMember($role))
+it('mọi Vai trò xem được danh sách Sản phẩm, chỉ Quản trị vào được trang Tạo', function (string $role, bool $canCreate) {
+    $this->actingAs(staffInRole($role))
         ->get(ProductResource::getUrl('index'))
         ->assertOk();
 
@@ -57,9 +56,9 @@ it('mọi Vai trò xem được danh sách Sản phẩm, chỉ Quản trị vào
     Livewire::test(ListProducts::class)
         ->{$canCreate ? 'assertActionVisible' : 'assertActionHidden'}(CreateAction::class);
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, false],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', false],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('Quản trị tạo Sản phẩm bằng cách chọn Loại sản phẩm, xong về danh sách', function () {
@@ -68,7 +67,7 @@ it('Quản trị tạo Sản phẩm bằng cách chọn Loại sản phẩm, xon
         new ContentFieldDraft('password', 'Mật khẩu'),
     ], name: 'Tài khoản streaming');
 
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
 
     Livewire::test(CreateProduct::class)
         ->fillForm([
@@ -96,7 +95,7 @@ it('Quản trị tạo Sản phẩm bằng cách chọn Loại sản phẩm, xon
 });
 
 it('trang Tạo bỏ hẳn Trường nội dung, Chuẩn hoá Khoá chống trùng và ô Dạng hàng', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
 
     // Soi cấu trúc form chứ không dò chữ trên trang: mô tả khối Mẫu giao hàng có nhắc tới
     // "Trường nội dung" một cách hợp lệ, nên assertDontSee sẽ bắt oan.
@@ -119,7 +118,7 @@ it('ô Số slot mặc định chỉ hiện khi Loại có Dạng hàng Tài kho
         new ContentFieldDraft('username', 'Tên đăng nhập', dedupeKey: true),
     ], name: 'Tài khoản streaming');
 
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
 
     Livewire::test(CreateProduct::class)
         ->fillForm(['product_type_id' => cardType()->id])
@@ -131,9 +130,9 @@ it('ô Số slot mặc định chỉ hiện khi Loại có Dạng hàng Tài kho
 it('Loại đã Ngừng dùng biến khỏi ô chọn khi tạo Sản phẩm mới, nhưng Sản phẩm cũ vẫn thấy Loại của mình', function () {
     $product = steamWalletProduct();
     $type = $product->productType;
-    app(ProductTypeCatalog::class)->discontinue(staffMember(Role::Admin), $type);
+    app(ProductTypeCatalog::class)->discontinue(staffInRole('admin'), $type);
 
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
 
     $options = fn (bool $expected): Closure => fn (Select $field): bool => array_key_exists($type->id, $field->getOptions()) === $expected;
 
@@ -145,7 +144,7 @@ it('Loại đã Ngừng dùng biến khỏi ô chọn khi tạo Sản phẩm m�
 });
 
 it('lỗi nghiệp vụ ở trang Tạo thành thông báo, không ghi gì và ở lại form', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $existing = steamWalletProduct();
 
     Livewire::test(CreateProduct::class)
@@ -164,7 +163,7 @@ it('lỗi nghiệp vụ ở trang Tạo thành thông báo, không ghi gì và �
 });
 
 it('Quản trị sửa Sản phẩm ở trang riêng, lưu xong ở lại trang', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $product = steamWalletProduct();
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
@@ -185,7 +184,7 @@ it('Quản trị sửa Sản phẩm ở trang riêng, lưu xong ở lại trang'
 });
 
 it('Sản phẩm đã có hàng bị khoá ô Loại sản phẩm và được giải thích ngay đầu trang', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $product = steamWalletProduct();
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
@@ -205,8 +204,8 @@ it('Sản phẩm đã có hàng bị khoá ô Loại sản phẩm và được g
 
 it('cùng một hộp giải thích thêm dòng Mã sản phẩm khi Sản phẩm đã có Phiếu xuất', function () {
     app(KeyFingerprints::class)->register();
-    $admin = staffMember(Role::Admin);
-    $seller = staffMember(Role::Sale);
+    $admin = staffInRole('admin');
+    $seller = staffInRole('sale');
     $product = steamWalletProduct();
 
     $intake = app(BatchIntake::class);
@@ -234,7 +233,7 @@ it('cùng một hộp giải thích thêm dòng Mã sản phẩm khi Sản phẩ
 it('khối Mẫu giao hàng thu gọn sẵn khi Sản phẩm chưa ghi đè mẫu riêng', function () {
     $collapsed = fn (bool $expected): Closure => fn (Section $section): bool => $section->isCollapsed() === $expected;
 
-    $this->actingAs($admin = staffMember(Role::Admin));
+    $this->actingAs($admin = staffInRole('admin'));
     $product = steamWalletProduct();
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
@@ -251,7 +250,7 @@ it('khối Mẫu giao hàng thu gọn sẵn khi Sản phẩm chưa ghi đè mẫ
 });
 
 it('Quản trị Ngừng bán Sản phẩm; Sản phẩm đã có hàng không có nút xoá', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $stocked = steamWalletProduct(stocked: true);
 
     Livewire::test(ListProducts::class)
@@ -263,7 +262,7 @@ it('Quản trị Ngừng bán Sản phẩm; Sản phẩm đã có hàng không c
 });
 
 it('header trang Sửa có Xoá, xoá xong về danh sách', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $product = steamWalletProduct();
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
@@ -275,7 +274,7 @@ it('header trang Sửa có Xoá, xoá xong về danh sách', function () {
 });
 
 it('header trang Sửa có Ngừng bán; Sản phẩm đã có hàng không có nút xoá', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $stocked = steamWalletProduct(stocked: true);
 
     Livewire::test(EditProduct::class, ['record' => $stocked->getRouteKey()])
@@ -286,9 +285,9 @@ it('header trang Sửa có Ngừng bán; Sản phẩm đã có hàng không có 
     expect($stocked->fresh()->isDiscontinued())->toBeTrue();
 });
 
-it('Nhập kho và Bán hàng không sửa, không Ngừng bán, không xoá được Sản phẩm', function (Role $role) {
+it('Nhập kho và Bán hàng không sửa, không Ngừng bán, không xoá được Sản phẩm', function (string $role) {
     $product = steamWalletProduct();
-    $this->actingAs(staffMember($role));
+    $this->actingAs(staffInRole($role));
 
     $this->get(ProductResource::getUrl('edit', ['record' => $product]))->assertForbidden();
 
@@ -297,6 +296,6 @@ it('Nhập kho và Bán hàng không sửa, không Ngừng bán, không xoá đ�
         ->assertActionHidden(TestAction::make('discontinue')->table($product))
         ->assertActionHidden(TestAction::make('delete')->table($product));
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);

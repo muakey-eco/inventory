@@ -24,7 +24,7 @@ final readonly class FreezeState
     }
 
     /**
-     * Ai bật: tên Quản trị, hoặc lệnh trên server khi kho tự dừng sau khôi phục.
+     * Ai bật: tên nhân viên, hoặc lệnh trên server khi kho tự dừng sau khôi phục.
      */
     public function actorLabel(): string
     {

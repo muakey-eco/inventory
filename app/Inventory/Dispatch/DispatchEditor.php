@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Dispatch;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\Dispatch;
 use App\Models\DispatchLine;
 use App\Models\User;
@@ -18,15 +18,15 @@ use Illuminate\Support\Facades\DB;
  */
 class DispatchEditor
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDispatch
      */
     public function edit(User $actor, Dispatch $dispatch, DispatchEdit $edit): Dispatch
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
 
         $ref = trim((string) $edit->externalRef);
 
@@ -88,12 +88,12 @@ class DispatchEditor
     }
 
     /**
-     * Nhân viên có sửa được phiếu này lúc này không: Bán hàng, phiếu Hoàn tất. Để panel ẩn nút sửa,
+     * Nhân viên có sửa được phiếu này lúc này không: Quyền Xuất hàng, phiếu Hoàn tất. Để panel ẩn nút sửa,
      * không thay cho kiểm tra trong {@see edit()}.
      */
     public function canEdit(User $actor, Dispatch $dispatch): bool
     {
-        return $dispatch->status === DispatchStatus::Completed && $this->roles->allows($actor, Role::Sale);
+        return $dispatch->status === DispatchStatus::Completed && $this->gate->allows($actor, Permission::Dispatch);
     }
 
     /**

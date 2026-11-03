@@ -9,8 +9,8 @@ use App\Filament\Resources\StockUnits\RelationManagers\RevealLogEntriesRelationM
 use App\Filament\Resources\StockUnits\RelationManagers\SlotsRelationManager;
 use App\Filament\Support\InventoryAction;
 use App\Filament\Support\NavGroup;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Inventory\Stock\SlotStatus;
 use App\Inventory\Stock\StockUnitStatus;
@@ -36,8 +36,8 @@ use UnitEnum;
 
 /**
  * Đơn vị hàng trong panel, chỉ đọc. Danh sách và chi tiết luôn ở dạng che: nội dung đầy đủ
- * chỉ hiện qua ContentReveal (Quản trị xem Slot Còn hàng ở chi tiết). Bán hàng không thấy
- * Giá vốn và Nhà cung cấp.
+ * chỉ hiện qua ContentReveal (Quyền Xem hàng Còn hàng, ở chi tiết). Thiếu Quyền Xem giá
+ * vốn và Nhà cung cấp thì không thấy Giá vốn và Nhà cung cấp.
  */
 class StockUnitResource extends Resource
 {
@@ -120,8 +120,8 @@ class StockUnitResource extends Resource
                 ]),
             Section::make('Lần giao bị ảnh hưởng')
                 ->description('Đơn vị hàng đang Lỗi: các lần giao còn Đã giao. Hãy liên hệ khách; hệ thống không tự Đổi hàng.')
-                // Có thông tin khách: chỉ Bán hàng và Quản trị.
-                ->visible(fn (StockUnit $record): bool => $record->status === StockUnitStatus::Defective && app(RoleGate::class)->allows(InventoryAction::actor(), Role::Sale))
+                // Có thông tin khách: chỉ người có Quyền Xuất hàng.
+                ->visible(fn (StockUnit $record): bool => $record->status === StockUnitStatus::Defective && app(PermissionGate::class)->allows(InventoryAction::actor(), Permission::Dispatch))
                 ->schema([
                     RepeatableEntry::make('affected_deliveries')
                         ->hiddenLabel()
@@ -232,6 +232,6 @@ class StockUnitResource extends Resource
 
     private static function seesCost(): bool
     {
-        return app(RoleGate::class)->allows(InventoryAction::actor(), Role::Importer);
+        return app(PermissionGate::class)->allows(InventoryAction::actor(), Permission::CostView);
     }
 }

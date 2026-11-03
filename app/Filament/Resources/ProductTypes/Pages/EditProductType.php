@@ -69,7 +69,7 @@ class EditProductType extends EditRecord
 
     /**
      * Lời của bước xem trước. Khai báo không hợp lệ (thiếu Khoá chống trùng, regex sai...) nói
-     * luôn ở đây, không bắt Quản trị bấm xác nhận rồi mới báo.
+     * luôn ở đây, không bắt người sửa bấm xác nhận rồi mới báo.
      */
     private function previewText(): string
     {

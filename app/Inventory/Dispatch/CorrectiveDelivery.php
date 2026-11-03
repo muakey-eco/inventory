@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Dispatch;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Encryption\KeyFingerprintMismatch;
 use App\Inventory\Encryption\KeyFingerprints;
 use App\Inventory\Stock\InvalidVoid;
@@ -25,8 +25,8 @@ use Illuminate\Support\Facades\DB;
  * Giao thay: sửa một lần Giao hàng nhầm do nhân viên. Huỷ hàng Slot đã giao với lý do giao nhầm (tuỳ
  * chọn cả Đơn vị hàng khi nội dung đã gửi cho khách), rồi giao một Slot của Đơn vị hàng khác theo
  * Thứ tự xuất vào cùng Phiếu xuất, liên kết với lần giao bị huỷ. Cùng Sản phẩm thì dùng Dòng xuất gốc; Sản phẩm khác
- * thì thêm Dòng xuất loại Giao thay, dòng gốc giữ nguyên số lượng. Bán hàng làm được trong hạn cấu
- * hình (mặc định 24 giờ từ lúc giao), quá hạn chỉ Quản trị kèm lý do. Không tạo Báo lỗi, không đổi
+ * thì thêm Dòng xuất loại Giao thay, dòng gốc giữ nguyên số lượng. Quyền Xuất hàng làm được trong
+ * hạn cấu hình (mặc định 24 giờ từ lúc giao), quá hạn cần thêm Quyền Vượt hạn và lý do. Không tạo Báo lỗi, không đổi
  * Đơn vị hàng sang Lỗi.
  */
 class CorrectiveDelivery
@@ -35,18 +35,18 @@ class CorrectiveDelivery
     private const REPLACEMENT_PROBLEM = 'Lần giao Đổi hàng không Giao thay được; hãy Báo lỗi rồi Đổi hàng.';
 
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private KeyFingerprints $fingerprints,
         private StockLedger $ledger,
         private StockVoid $voids,
     ) {}
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function preview(User $actor, Delivery $delivery): CorrectionPreview
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
 
         $current = Delivery::query()->with('stockUnit.product')->findOrFail($delivery->getKey());
 
@@ -66,18 +66,18 @@ class CorrectiveDelivery
      */
     public function canCorrect(User $actor, Delivery $delivery): bool
     {
-        return $this->roles->allows($actor, Role::Sale)
+        return $this->gate->allows($actor, Permission::Dispatch)
             && $delivery->dispatchLine->dispatch->status === DispatchStatus::Completed
             && $delivery->slot->status === SlotStatus::Delivered
             && ! self::isReplacement($delivery)
             && StockVoid::pendingDefectReportId($delivery->slot_id) === null
-            && (! self::isLate($delivery) || $this->roles->allows($actor));
+            && (! self::isLate($delivery) || $this->gate->allows($actor, Permission::DeadlineOverride));
     }
 
     /**
      * @return Delivery lần giao mới
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDispatch
      * @throws InvalidVoid
      * @throws OutOfStock
@@ -85,7 +85,7 @@ class CorrectiveDelivery
      */
     public function correct(User $actor, Delivery $delivery, CorrectionDraft $draft): Delivery
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
 
         if ($draft->voidUnit && ! $draft->contentSent) {
             throw new InvalidDispatch([new DispatchProblem('Chỉ Huỷ hàng cả Đơn vị hàng khi nội dung đã gửi cho khách.')]);
@@ -150,8 +150,8 @@ class CorrectiveDelivery
 
         $hours = self::hours();
 
-        if (! $this->roles->allows($actor)) {
-            return [new DispatchProblem("Đã quá {$hours} giờ kể từ lúc giao; chỉ Quản trị Giao thay được.")];
+        if (! $this->gate->allows($actor, Permission::DeadlineOverride)) {
+            return [new DispatchProblem("Đã quá {$hours} giờ kể từ lúc giao; chỉ người có Quyền Vượt hạn Giao thay được.")];
         }
 
         return trim((string) $draft->reason) === '' ? [new DispatchProblem("Giao thay quá {$hours} giờ phải nhập lý do.")] : [];

@@ -1,7 +1,7 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\ProductCatalog;
@@ -45,8 +45,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->manual = app(ManualDispatch::class);
     $this->corrective = app(CorrectiveDelivery::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -163,7 +163,7 @@ it('quá 24 giờ Bán hàng không Giao thay được; Quản trị Giao thay �
         ->and($this->corrective->canCorrect($this->seller, $wrong))->toBeFalse()
         ->and($this->corrective->canCorrect($this->admin, $wrong))->toBeTrue()
         ->and(fn () => $this->corrective->correct($this->seller, $wrong, $draft))
-        ->toThrow(InvalidDispatch::class, 'Đã quá 24 giờ kể từ lúc giao; chỉ Quản trị Giao thay được.')
+        ->toThrow(InvalidDispatch::class, 'Đã quá 24 giờ kể từ lúc giao; chỉ người có Quyền Vượt hạn Giao thay được.')
         ->and(fn () => $this->corrective->correct($this->admin, $wrong, $draft))
         ->toThrow(InvalidDispatch::class, 'Giao thay quá 24 giờ phải nhập lý do.')
         ->and(Delivery::count())->toBe(1);
@@ -179,6 +179,18 @@ it('quá 24 giờ Bán hàng không Giao thay được; Quản trị Giao thay �
 
     expect($this->corrective->preview($this->seller, $other))->late->toBeFalse()
         ->and($this->corrective->correct($this->seller, $other, $draft)->corrects_delivery_id)->toBe($other->id);
+});
+
+it('quá hạn Giao thay chỉ người có cả Xuất hàng và Vượt hạn Giao thay được', function () {
+    correctionStock($this->steam, "SR1\tA-1\nSR2\tA-2");
+    $wrong = soleDelivery(correctionOrder('SP-001', $this->steam));
+    $this->travel(25)->hours();
+    $overrider = staffMember(Permission::Dispatch, Permission::DeadlineOverride);
+
+    expect($this->corrective->canCorrect(staffMember(Permission::Dispatch), $wrong))->toBeFalse()
+        ->and($this->corrective->canCorrect(staffMember(Permission::DeadlineOverride), $wrong))->toBeFalse()
+        ->and($this->corrective->canCorrect($overrider, $wrong))->toBeTrue()
+        ->and($this->corrective->correct($overrider, $wrong, new CorrectionDraft(product: null, contentSent: false, reason: 'Khách báo nhầm mã'))->corrects_delivery_id)->toBe($wrong->id);
 });
 
 it('nội dung đã gửi và Huỷ hàng cả Đơn vị hàng: liệt kê Lần giao bị ảnh hưởng, Slot còn trong kho Đã huỷ, không giải phóng Khoá chống trùng, không tự Báo lỗi', function () {
@@ -290,7 +302,7 @@ it('Giao thay báo lỗi và không đổi gì', function (Closure $arrange, str
 
         return [test()->seller, new CorrectionDraft(null, contentSent: false)];
     }, InvalidDispatch::class, 'Chỉ Giao thay được trên Phiếu xuất Hoàn tất.'],
-    'Nhập kho' => [fn () => [staffMember(Role::Importer), new CorrectionDraft(null, contentSent: false)], MissingRole::class, ''],
+    'Nhập kho' => [fn () => [staffInRole('importer'), new CorrectionDraft(null, contentSent: false)], MissingPermission::class, ''],
 ]);
 
 it('Sửa phiếu không đặt được Giá bán cho Dòng xuất loại Giao thay; để trống vẫn lưu được', function () {

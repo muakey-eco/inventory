@@ -2,17 +2,17 @@
 
 namespace App\Inventory\Staff;
 
-use App\Inventory\Access\Role;
+use App\Inventory\Access\Permission;
 use App\Inventory\Security\SecurityEvent;
 use App\Inventory\Security\SecurityLog;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Bản sao trong kho của những gì platform nói về một nhân viên (ADR 0011): bản chụp Vai trò theo
+ * Bản sao trong kho của những gì platform nói về một nhân viên (ADR 0011): bản chụp Quyền theo
  * lần cuối kho thấy họ, và việc họ có còn quyền vào kho theo Bản sao danh bạ. Mỗi thay đổi ghi
  * Nhật ký bảo mật; không đổi thì không ghi gì, để request và lượt quét bù lặp lại không ghi lặp.
- * Không bao giờ đụng Khoá nhân viên. `syncRoles` tự mở transaction vì nó chạy ở mọi request;
+ * Không bao giờ đụng Khoá nhân viên. `syncPermissions` tự mở transaction vì nó chạy ở mọi request;
  * `grantOrRevoke` thì phải gọi trong transaction của người gọi, nơi đã khoá hàng nhân viên.
  */
 class StaffMirror
@@ -20,27 +20,30 @@ class StaffMirror
     public function __construct(private SecurityLog $log) {}
 
     /**
-     * Cập nhật bản chụp Vai trò theo Permission platform vừa trả cho nhân viên. Hai request song
-     * song cùng thấy Vai trò mới thì chỉ một request ghi nhật ký.
+     * Cập nhật bản chụp Quyền theo Permission platform vừa trả cho nhân viên, ghi Quyền được thêm
+     * và bị bớt. Hai request song song cùng thấy Quyền mới thì chỉ một request ghi nhật ký.
      *
-     * @param  list<Role>  $roles
+     * @param  list<Permission>  $permissions
      */
-    public function syncRoles(User $staff, array $roles): void
+    public function syncPermissions(User $staff, array $permissions): void
     {
-        $to = self::roleNames($roles);
+        $to = Permission::names($permissions);
 
-        if (self::roleNames($staff->roles) === $to) {
+        if (Permission::names($staff->permissions) === $to) {
             return;
         }
 
-        DB::transaction(function () use ($staff, $roles, $to): void {
+        DB::transaction(function () use ($staff, $permissions, $to): void {
             $locked = User::query()->lockForUpdate()->findOrFail($staff->getKey());
-            $from = self::roleNames($locked->roles);
+            $from = Permission::names($locked->permissions);
 
             if ($from !== $to) {
-                $locked->forceFill(['roles' => $roles])->save();
+                $locked->forceFill(['permissions' => $permissions])->save();
 
-                $this->log->record(SecurityEvent::RolesChanged, $locked, details: ['from' => $from, 'to' => $to]);
+                $this->log->record(SecurityEvent::PermissionsChanged, $locked, details: [
+                    'added' => array_values(array_diff($to, $from)),
+                    'removed' => array_values(array_diff($from, $to)),
+                ]);
             }
 
             $staff->setRawAttributes($locked->getAttributes(), sync: true);
@@ -90,17 +93,5 @@ class StaffMirror
         $staff->forceFill(['platform_revoked_at' => null, 'platform_revoked_reason' => null])->save();
 
         $this->log->record(SecurityEvent::PlatformAccessRestored, $staff);
-    }
-
-    /**
-     * Tên Vai trò theo thứ tự khai báo, để so sánh và ghi nhật ký không phụ thuộc thứ tự platform
-     * trả Permission.
-     *
-     * @param  iterable<Role>  $roles
-     * @return list<string>
-     */
-    public static function roleNames(iterable $roles): array
-    {
-        return array_map(fn (Role $role): string => $role->value, Role::inOrder($roles));
     }
 }

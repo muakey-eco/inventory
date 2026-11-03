@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  * nội dung, khai 3–4 trường trong khung modal là vừa cuộn vừa đoán.
  *
  * Adapter mỏng: mọi quy tắc nằm ở ProductTypeCatalog; lỗi nghiệp vụ thành thông báo và giữ
- * nguyên form để Quản trị sửa. Loại mới chưa Sản phẩm nào dùng nên không cần xem trước.
+ * nguyên form để người khai báo sửa. Loại mới chưa Sản phẩm nào dùng nên không cần xem trước.
  */
 class CreateProductType extends CreateRecord
 {

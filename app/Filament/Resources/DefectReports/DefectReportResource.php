@@ -32,7 +32,7 @@ use UnitEnum;
 /**
  * Báo lỗi trong panel: danh sách (tab tồn đọng Chờ xác minh quá hạn) và trang xác minh. Adapter
  * mỏng: tạo từ bảng Lần giao của Phiếu xuất, xác minh và xem mã gọi DefectReporting, ContentReveal.
- * Nội dung luôn dạng che. Nhập kho không thấy.
+ * Nội dung luôn dạng che.
  */
 class DefectReportResource extends Resource
 {
@@ -122,7 +122,7 @@ class DefectReportResource extends Resource
                     TextEntry::make('verified_at')->label('Xác minh lúc')->dateTime('d/m/Y H:i'),
                     TextEntry::make('verification_note')->label('Ghi chú')->columnSpanFull(),
                 ]),
-            // Không hiện Chi phí đổi hàng hay Nhà cung cấp: Bán hàng không được thấy.
+            // Không hiện Chi phí đổi hàng hay Nhà cung cấp: người chỉ có Quyền Báo lỗi và Đổi hàng không được thấy.
             Section::make('Kết quả xử lý')
                 ->columns(3)
                 ->visible(fn (DefectReport $record): bool => $record->resolution !== null)
@@ -138,7 +138,7 @@ class DefectReportResource extends Resource
                         ->label('Yêu cầu duyệt Đổi hàng')
                         ->visible(fn (DefectReport $record): bool => $record->replacement_approval_requested_by !== null),
                     TextEntry::make('replacementApprover.name')
-                        ->label('Quản trị duyệt Đổi hàng')
+                        ->label('Người duyệt Đổi hàng')
                         ->visible(fn (DefectReport $record): bool => $record->replacement_approved_by !== null),
                     TextEntry::make('resolution_note')
                         ->label('Lý do Không đổi')

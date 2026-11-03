@@ -1,6 +1,5 @@
 <?php
 
-use App\Inventory\Access\Role;
 use App\Inventory\Api\ApiKeys;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
@@ -30,7 +29,7 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-17 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->freeze = app(DispatchFreeze::class);
     $this->website = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Website', SalesChannelType::Api));
     $this->secret = app(ApiKeys::class)->issue($this->admin, $this->website)->secret;

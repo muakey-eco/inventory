@@ -3,7 +3,6 @@
 use App\Filament\Pages\DispatchProfitReportPage;
 use App\Filament\Pages\ProfitReportPage;
 use App\Filament\Pages\SupplierLossReportPage;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -29,9 +28,9 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
 
     $this->netflix = productOf(
         StockForm::Account,
@@ -70,16 +69,16 @@ beforeEach(function () {
     $this->dispatchRow = 'phieu-xuat-'.Dispatch::sole()->id;
 });
 
-it('chỉ Quản trị vào được ba trang báo cáo Lãi/lỗ', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
+it('chỉ Quản trị vào được ba trang báo cáo Lãi/lỗ', function (?string $role, bool $sees) {
+    $this->actingAs($role === null ? User::factory()->create() : staffInRole($role));
 
     foreach ([ProfitReportPage::getUrl(), DispatchProfitReportPage::getUrl(), SupplierLossReportPage::getUrl()] as $url) {
         $this->get($url)->assertStatus($sees ? 200 : 403);
     }
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, false],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', false],
+    'Bán hàng' => ['sale', false],
     'không vai trò' => [null, false],
 ]);
 

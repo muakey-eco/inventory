@@ -5,7 +5,7 @@ namespace App\Inventory\Dispatch;
 use Carbon\CarbonImmutable;
 
 /**
- * Một Slot Còn hàng khớp Khoá chống trùng mà Quản trị đang tra, để chọn đích danh cho Ghi nhận giao
+ * Một Slot Còn hàng khớp Khoá chống trùng mà nhân viên đang tra, để chọn đích danh cho Ghi nhận giao
  * bù. Nội dung chỉ ở dạng che: chọn Slot không phải là xem mã.
  */
 final readonly class RecordedSlot

@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -35,9 +34,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
     $this->claims = app(SupplierClaims::class);
     $this->netflix = productOf(
         StockForm::Account,
@@ -107,7 +106,7 @@ it('Khiếu nại chỉ nhận Đơn vị hàng Lỗi, của đúng Nhà cung c�
         ->and(fn () => $this->claims->create($this->stocker, $this->kinguin, [$this->a, $this->g]))
         ->toThrow(InvalidSupplierClaim::class, "Đơn vị hàng #{$this->g->id} không thuộc Nhà cung cấp Kinguin.")
         ->and(fn () => $this->claims->create($this->seller, $this->kinguin, [$this->a]))
-        ->toThrow(MissingRole::class);
+        ->toThrow(MissingPermission::class);
 
     $this->claims->create($this->stocker, $this->kinguin, [$this->a]);
 
@@ -161,7 +160,7 @@ it('Giải quyết ghi kết quả từng Đơn vị hàng: bồi hoàn tiền k
         ->toThrow(InvalidSupplierClaim::class, "Bồi hoàn tiền của Đơn vị hàng #{$this->a->id} phải có ngày.")
         ->and(fn () => $this->claims->resolve($this->stocker, $claim, [$unitA->id => ClaimOutcomeDraft::refund(50_000, CarbonImmutable::tomorrow()), $unitB->id => ClaimOutcomeDraft::rejected()]))
         ->toThrow(InvalidSupplierClaim::class, "Ngày bồi hoàn tiền của Đơn vị hàng #{$this->a->id} không được sau hôm nay.")
-        ->and(fn () => $this->claims->resolve($this->seller, $claim, []))->toThrow(MissingRole::class)
+        ->and(fn () => $this->claims->resolve($this->seller, $claim, []))->toThrow(MissingPermission::class)
         ->and($claim->fresh()->status)->toBe(SupplierClaimStatus::Sent);
 
     $this->claims->resolve($this->stocker, $claim, [
@@ -248,7 +247,7 @@ it('Xem mã Đơn vị hàng trong khiếu nại ghi Nhật ký xem mã ngữ c�
         ->toBe($this->a->slots->map(fn (Slot $slot) => [$this->stocker->id, RevealContextType::SupplierClaim, $claim->id, $this->a->id, $slot->id, "Khiếu nại nhà cung cấp #{$claim->id}"])->all())
         ->and($reveal->canRevealClaimUnit($this->stocker, $unitA))->toBeTrue()
         ->and($reveal->canRevealClaimUnit($this->seller, $unitA))->toBeFalse()
-        ->and(fn () => $reveal->revealClaimUnit($this->seller, $unitA))->toThrow(MissingRole::class);
+        ->and(fn () => $reveal->revealClaimUnit($this->seller, $unitA))->toThrow(MissingPermission::class);
 
     $this->claims->removeUnit($this->stocker, $unitB);
 
@@ -303,7 +302,7 @@ it('Hàng thay thế vào kho bằng Lô nhập bình thường liên kết vớ
         ->toThrow(InvalidBatch::class, 'Hàng thay thế từ Khiếu nại nhà cung cấp có Giá vốn 0 (Dòng nhập "Netflix 1 tháng").')
         ->and(fn () => $intake->submit($this->stocker, $replacement(supplier: $this->g2a)))
         ->toThrow(InvalidBatch::class, 'Lô nhập hàng thay thế phải cùng Nhà cung cấp với Khiếu nại.')
-        ->and(fn () => $intake->submit($this->seller, $replacement()))->toThrow(MissingRole::class);
+        ->and(fn () => $intake->submit($this->seller, $replacement()))->toThrow(MissingPermission::class);
 
     $batch = $intake->confirm($this->stocker, $intake->submit($this->stocker, $replacement()));
     $units = StockUnit::whereIn('content->username', ['r@shop.test', 's@shop.test'])->orderBy('id')->get();

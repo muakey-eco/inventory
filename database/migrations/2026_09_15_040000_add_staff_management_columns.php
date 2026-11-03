@@ -14,7 +14,7 @@ return new class extends Migration
         });
 
         Schema::table('security_log_entries', function (Blueprint $table) {
-            // user_id là nhân viên chịu tác động; actor_id là Quản trị thực hiện thao tác
+            // user_id là nhân viên chịu tác động; actor_id là người thực hiện thao tác
             // (null khi làm từ lệnh artisan trên server).
             $table->foreignId('actor_id')->nullable()->constrained('users')->restrictOnDelete();
             $table->jsonb('details')->nullable();

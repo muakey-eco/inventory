@@ -19,7 +19,7 @@ return new class extends Migration
             $table->text('description');
             // Ảnh khách gửi, trên disk private của app.
             $table->string('screenshot_path')->nullable();
-            // Quản trị tạo Báo lỗi ngoài Hạn bảo hành (hoặc thời hạn bảo hành 0) phải ghi lý do.
+            // Báo lỗi ngoài Hạn bảo hành (hoặc thời hạn bảo hành 0) phải ghi lý do.
             $table->text('warranty_override_reason')->nullable();
             // Báo lỗi hàng loạt tự Xác nhận cho Lần giao bị ảnh hưởng: trỏ về Báo lỗi làm Đơn vị hàng chuyển Lỗi.
             $table->foreignId('source_defect_report_id')->nullable()->constrained('defect_reports')->restrictOnDelete();

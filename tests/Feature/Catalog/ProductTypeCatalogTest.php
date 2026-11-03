@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\InvalidProductConfiguration;
@@ -17,7 +16,7 @@ use App\Models\ProductType;
 
 beforeEach(function () {
     $this->catalog = app(ProductTypeCatalog::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
 });
 
 /**
@@ -57,14 +56,14 @@ it('Quản trị tạo Loại sản phẩm kèm Dạng hàng, Trường nội du
         ->sensitive->toBeTrue();
 });
 
-it('chỉ Quản trị tạo được Loại sản phẩm', function (Role $role) {
-    expect(fn () => $this->catalog->create(staffMember($role), cardTypeDraft()))
-        ->toThrow(MissingRole::class);
+it('chỉ Quản trị tạo được Loại sản phẩm', function (string $role) {
+    expect(fn () => $this->catalog->create(staffInRole($role), cardTypeDraft()))
+        ->toThrow(MissingPermission::class);
 
     expect(ProductType::count())->toBe(0);
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);
 
 it('tuỳ chọn chuẩn hoá mặc định theo Dạng hàng', function (StockForm $form, string $raw, string $normalized) {
@@ -359,20 +358,20 @@ it('Loại đang có Sản phẩm không xoá được, chỉ Ngừng dùng', fu
     expect(ProductType::find($type->id))->not->toBeNull();
 });
 
-it('chỉ Quản trị sửa, Ngừng dùng và xoá được Loại sản phẩm', function (Role $role) {
+it('chỉ Quản trị sửa, Ngừng dùng và xoá được Loại sản phẩm', function (string $role) {
     $type = $this->catalog->create($this->admin, cardTypeDraft());
-    $staff = staffMember($role);
+    $staff = staffInRole($role);
 
-    expect(fn () => $this->catalog->update($staff, $type, cardTypeDraft(name: 'Đổi tên')))->toThrow(MissingRole::class)
-        ->and(fn () => $this->catalog->preview($staff, $type, cardTypeDraft(name: 'Đổi tên')))->toThrow(MissingRole::class)
-        ->and(fn () => $this->catalog->discontinue($staff, $type))->toThrow(MissingRole::class)
-        ->and(fn () => $this->catalog->delete($staff, $type))->toThrow(MissingRole::class);
+    expect(fn () => $this->catalog->update($staff, $type, cardTypeDraft(name: 'Đổi tên')))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->catalog->preview($staff, $type, cardTypeDraft(name: 'Đổi tên')))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->catalog->discontinue($staff, $type))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->catalog->delete($staff, $type))->toThrow(MissingPermission::class);
 
     $type = $type->fresh();
 
     expect($type->name)->toBe('Thẻ nạp')
         ->and($type->isDiscontinued())->toBeFalse();
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);

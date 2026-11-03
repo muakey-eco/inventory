@@ -14,7 +14,7 @@ namespace App\Inventory\Catalog;
 final readonly class ProductTypeChange
 {
     /**
-     * @param  list<string>  $applied  thay đổi sẽ ghi, viết cho Quản trị đọc
+     * @param  list<string>  $applied  thay đổi sẽ ghi, viết cho người khai báo đọc
      * @param  list<string>  $rejected  thay đổi chạm dữ liệu đã lưu, chỉ khác rỗng khi có Sản phẩm chặn
      * @param  list<string>  $blockingProducts  Mã sản phẩm của các Sản phẩm đã có hàng đang chặn
      * @param  list<string>  $affectedProducts  Mã sản phẩm của mọi Sản phẩm thuộc Loại
@@ -37,7 +37,7 @@ final readonly class ProductTypeChange
     }
 
     /**
-     * Lý do từ chối, nêu đích danh Sản phẩm đang chặn. Viết cho Quản trị đọc, không phải log.
+     * Lý do từ chối, nêu đích danh Sản phẩm đang chặn. Viết cho người khai báo đọc, không phải log.
      */
     public function rejectionMessage(): string
     {

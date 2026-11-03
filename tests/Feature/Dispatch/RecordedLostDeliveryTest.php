@@ -1,8 +1,7 @@
 <?php
 
 use App\Filament\Pages\DispatchFreezePage;
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -43,8 +42,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-17 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->recorded = app(RecordedLostDelivery::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->shopee = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Shopee'));
@@ -152,9 +151,9 @@ it('làm được khi kho đang Tạm dừng xuất kho: đó chính là lúc c�
 });
 
 it('chỉ Quản trị; Slot, lý do và mốc giao được kiểm tra', function () {
-    expect(fn () => $this->recorded->candidates($this->seller, 'a@shop.test'))->toThrow(MissingRole::class)
+    expect(fn () => $this->recorded->candidates($this->seller, 'a@shop.test'))->toThrow(MissingPermission::class)
         ->and(fn () => $this->recorded->record($this->seller, new RecordedDeliveryDraft($this->slot, channel: $this->shopee, reason: 'x')))
-        ->toThrow(MissingRole::class)
+        ->toThrow(MissingPermission::class)
         ->and(fn () => $this->recorded->record($this->admin, new RecordedDeliveryDraft(null, channel: $this->shopee, reason: 'x')))
         ->toThrow(InvalidDispatch::class, 'Chưa chọn Slot')
         ->and(fn () => $this->recorded->record($this->admin, new RecordedDeliveryDraft($this->slot, channel: $this->shopee, reason: '  ')))

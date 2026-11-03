@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('sales_channel_id')->constrained()->restrictOnDelete();
             $table->string('label')->nullable();
             $table->string('key_hash', 64)->unique();
-            // Vài ký tự đầu của bí mật, để Quản trị nhận ra khoá nào trong danh sách.
+            // Vài ký tự đầu của bí mật, để người quản Khoá API nhận ra khoá nào trong danh sách.
             $table->string('prefix', 12);
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             // Khoá mà khoá này thay thế khi xoay; hai khoá cùng hoạt động cho tới khi thu hồi khoá cũ.

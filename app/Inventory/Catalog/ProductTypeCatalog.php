@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Catalog;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\DeliveryTemplate;
 use App\Models\ProductType;
 use App\Models\User;
@@ -12,10 +12,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Loại sản phẩm: chỉ Quản trị tạo, sửa, Ngừng dùng, xoá. Sửa Loại là sửa mọi Sản phẩm thuộc
+ * Loại sản phẩm: chỉ người có Quyền Quản lý Sản phẩm và Loại sản phẩm tạo, sửa, Ngừng dùng, xoá. Sửa Loại là sửa mọi Sản phẩm thuộc
  * nó, nên đi qua bước xem trước ({@see preview()}) rồi mới ghi.
  *
- * Bản xem trước chỉ để Quản trị nhìn: {@see update()} tự phân hạng lại dưới khoá hàng, vì
+ * Bản xem trước chỉ để người sửa nhìn: {@see update()} tự phân hạng lại dưới khoá hàng, vì
  * giữa lúc xem và lúc bấm xác nhận có thể vừa có Lô nhập làm một Sản phẩm của Loại có hàng.
  */
 class ProductTypeCatalog
@@ -28,15 +28,15 @@ class ProductTypeCatalog
 
     private const FIELD_KEY_FORMAT = '/^[a-z][a-z0-9_]*$/';
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidProductConfiguration
      */
     public function create(User $actor, ProductTypeDraft $draft): ProductType
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
         self::validate($draft);
 
         return self::guardName($draft, fn (): ProductType => DB::transaction(
@@ -45,14 +45,14 @@ class ProductTypeCatalog
     }
 
     /**
-     * Thay đổi mà bản sửa này gây ra, để Quản trị xác nhận trước khi ghi.
+     * Thay đổi mà bản sửa này gây ra, để người sửa xác nhận trước khi ghi.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidProductConfiguration
      */
     public function preview(User $actor, ProductType $type, ProductTypeDraft $draft): ProductTypeChange
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
         self::validate($draft, $type);
 
         return self::change($type, $draft);
@@ -63,13 +63,13 @@ class ProductTypeCatalog
      * đối chiếu theo định danh: trường có sẵn được sửa, trường mới được thêm, trường vắng mặt
      * bị xoá.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidProductConfiguration
      * @throws LockedProductConfiguration Loại đã có Sản phẩm có hàng và bản sửa chạm dữ liệu đã lưu
      */
     public function update(User $actor, ProductType $type, ProductTypeDraft $draft): ProductType
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
 
         return self::guardName($draft, fn (): ProductType => DB::transaction(function () use ($type, $draft): ProductType {
             $current = ProductType::query()->lockForUpdate()->findOrFail($type->getKey());
@@ -96,11 +96,11 @@ class ProductTypeCatalog
     /**
      * Loại bị ẩn khỏi ô chọn khi tạo Sản phẩm mới; Sản phẩm đang dùng nó không đổi gì.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function discontinue(User $actor, ProductType $type): void
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
 
         $type->forceFill(['discontinued_at' => $type->discontinued_at ?? now()])->save();
     }
@@ -108,12 +108,12 @@ class ProductTypeCatalog
     /**
      * Chỉ xoá được Loại chưa Sản phẩm nào dùng (khai báo nhầm).
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws ProductTypeInUse
      */
     public function delete(User $actor, ProductType $type): void
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::CatalogManage);
 
         DB::transaction(function () use ($type): void {
             $current = ProductType::query()->lockForUpdate()->findOrFail($type->getKey());
@@ -148,7 +148,7 @@ class ProductTypeCatalog
      * `stock_units.content`, `secret_ciphertext` hay `dedupe_hash`) và hạng chạm dữ liệu đã lưu.
      *
      * Đổi phân hạng ở đây thì sửa luôn {@see LOCKED_CHANGES_NOTE}, câu mà trang Sửa hiện ra
-     * trước khi Quản trị kịp đâm vào giới hạn.
+     * trước khi người khai báo kịp đâm vào giới hạn.
      *
      * @return array{list<string>, list<string>}
      */
@@ -259,7 +259,7 @@ class ProductTypeCatalog
     }
 
     /**
-     * Hai Quản trị cùng đặt một tên Loại: kiểm tra trước chỉ bắt được trường hợp tuần tự,
+     * Hai người cùng đặt một tên Loại: kiểm tra trước chỉ bắt được trường hợp tuần tự,
      * unique index trên lower(name) bắt nốt trường hợp đồng thời.
      *
      * @template T

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  * Khai báo một Sản phẩm mới.
  *
  * Adapter mỏng: mọi quy tắc nằm ở ProductCatalog; lỗi nghiệp vụ thành thông báo và giữ
- * nguyên form để Quản trị sửa, không mất công khai lại.
+ * nguyên form để người khai báo sửa, không mất công khai lại.
  */
 class CreateProduct extends CreateRecord
 {

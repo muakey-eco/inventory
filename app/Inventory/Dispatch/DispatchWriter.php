@@ -145,7 +145,7 @@ final class DispatchWriter
     public function deliverHeld(DispatchActor $actor, Dispatch $dispatch, string $ledgerReason): void
     {
         // Đường giao duy nhất không qua SlotPicker: Slot đã được giữ từ trước. Hàng vẫn rời kho ở
-        // đây, nên đang tạm dừng thì phiếu ở nguyên Đang giữ cho tới khi Quản trị mở lại kho.
+        // đây, nên đang tạm dừng thì phiếu ở nguyên Đang giữ cho tới khi kho được mở lại.
         DispatchFreeze::guard();
 
         $heldByLine = SlotHolds::lockByLine($dispatch);

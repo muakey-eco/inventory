@@ -33,7 +33,7 @@ final class SlotPicker
     private const SKIP_LOCKED_FOR_DELIVERY = 'FOR UPDATE OF slots SKIP LOCKED FOR SHARE OF stock_units SKIP LOCKED';
 
     /**
-     * Khoá chia sẻ Sản phẩm theo thứ tự id (Quản trị không Ngừng bán hay đổi Mã sản phẩm, thời hạn
+     * Khoá chia sẻ Sản phẩm theo thứ tự id (không ai Ngừng bán hay đổi Mã sản phẩm, thời hạn
      * bảo hành giữa lúc kiểm tra và lúc giao; hai phiếu cùng Sản phẩm vẫn chạy song song), rồi chọn
      * và khoá Slot cho mọi dòng. Thiếu hàng ở bất kỳ dòng nào thì không giao gì.
      *

@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Pages\MovementReportPage;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -25,9 +24,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
 
     $this->netflix = productOf(
         StockForm::Account,
@@ -66,19 +65,19 @@ beforeEach(function () {
     ));
 });
 
-it('cả ba vai trò vào được báo cáo Nhập/xuất; nhân viên không có vai trò thì không', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
+it('cả ba vai trò vào được báo cáo Nhập/xuất; nhân viên không có vai trò thì không', function (?string $role, bool $sees) {
+    $this->actingAs($role === null ? User::factory()->create() : staffInRole($role));
 
     $this->get(MovementReportPage::getUrl())->assertStatus($sees ? 200 : 403);
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, true],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', true],
     'không vai trò' => [null, false],
 ]);
 
-it('Bán hàng không thấy cột Giá vốn, Giá bán và bộ lọc Nhà cung cấp', function (Role $role, bool $values) {
-    $this->actingAs(staffMember($role));
+it('Bán hàng không thấy cột Giá vốn, Giá bán và bộ lọc Nhà cung cấp', function (string $role, bool $values) {
+    $this->actingAs(staffInRole($role));
 
     $page = Livewire::test(MovementReportPage::class)
         ->assertCanSeeTableRecords([$this->netflix, $this->steam]);
@@ -89,9 +88,9 @@ it('Bán hàng không thấy cột Giá vốn, Giá bán và bộ lọc Nhà cun
 
     $values ? $page->assertTableFilterVisible('supplier') : $page->assertTableFilterHidden('supplier');
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('bảng hiện số liệu của MovementReport; lọc khoảng ngày và Sản phẩm', function () {

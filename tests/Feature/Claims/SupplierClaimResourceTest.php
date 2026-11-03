@@ -6,7 +6,6 @@ use App\Filament\Resources\SupplierClaims\Pages\ViewSupplierClaim;
 use App\Filament\Resources\SupplierClaims\RelationManagers\ClaimUnitsRelationManager;
 use App\Filament\Resources\SupplierClaims\SupplierClaimResource;
 use App\Filament\Resources\SupplierClaims\Widgets\UnclaimedDefectiveUnits;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -36,8 +35,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
     $this->netflix = productOf(
         StockForm::Account,
         [
@@ -68,15 +67,15 @@ beforeEach(function () {
     }
 });
 
-it('Quản trị và Nhập kho vào được trang Khiếu nại nhà cung cấp, Bán hàng thì không', function (Role $role, bool $sees) {
-    $this->actingAs(staffMember($role));
+it('Quản trị và Nhập kho vào được trang Khiếu nại nhà cung cấp, Bán hàng thì không', function (string $role, bool $sees) {
+    $this->actingAs(staffInRole($role));
 
     $this->get(SupplierClaimResource::getUrl('index'))->assertStatus($sees ? 200 : 403);
     $this->get(SupplierClaimResource::getUrl('create'))->assertStatus($sees ? 200 : 403);
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('Nhập kho tạo Khiếu nại từ bảng Đơn vị hàng Lỗi chưa khiếu nại; khác Nhà cung cấp thì báo lỗi', function () {

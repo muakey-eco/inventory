@@ -1,5 +1,7 @@
 # Platform Muakey làm chủ xác thực và Vai trò; kho giữ idle timeout của mình
 
+> Phần Vai trò của ADR này (Vai trò ứng với một Permission, Quản trị qua mọi cửa, option "Permission theo từng việc" bị bác) đã được thay bởi ADR 0012.
+
 Thay ADR 0008. Tổ chức đã chuyển các app nội bộ khỏi Authentik sang platform Muakey (`id.muakeyoffice.net/oidc`); helpcenter đi trước. Kho đăng nhập qua platform bằng SDK `muakey/platform-laravel` và nhận **Vai trò** từ đó. Mục tiêu của ADR 0008 giữ nguyên: shop quản nhân viên ở một chỗ cho mọi công cụ nội bộ. Kho chưa lên production nên chuyển trong một lượt, không cầu nối hai IdP.
 
 Mỗi **Vai trò** ứng với đúng một Permission trên platform (`admin`, `importer`, `sale`), cộng Permission vào cửa `access`. Platform chỉ trả Permission, không trả role, nên kho không gán quyền lẻ theo việc: giữ một Vai trò là giữ một Permission. **Khoá nhân viên** vẫn nằm ở kho, độc lập với platform.

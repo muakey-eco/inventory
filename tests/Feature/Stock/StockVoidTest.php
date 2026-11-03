@@ -2,8 +2,7 @@
 
 use App\Filament\Resources\StockUnits\Pages\ViewStockUnit;
 use App\Filament\Resources\StockUnits\RelationManagers\SlotsRelationManager;
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -37,8 +36,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->voids = app(StockVoid::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->netflix = productOf(
@@ -120,8 +119,8 @@ it('chỉ Quản trị Huỷ hàng; Slot hoặc Đơn vị hàng không còn hu�
     expect($this->voids->canVoidSlot($this->admin, $slot))->toBeTrue()
         ->and($this->voids->canVoidSlot($this->seller, $slot))->toBeFalse()
         ->and($this->voids->canVoidUnit($this->seller, $this->unit))->toBeFalse()
-        ->and(fn () => $this->voids->voidSlot($this->seller, $slot, VoidReason::ContentExposed))->toThrow(MissingRole::class)
-        ->and(fn () => $this->voids->voidUnit($this->seller, $this->unit, VoidReason::ContentExposed))->toThrow(MissingRole::class);
+        ->and(fn () => $this->voids->voidSlot($this->seller, $slot, VoidReason::ContentExposed))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->voids->voidUnit($this->seller, $this->unit, VoidReason::ContentExposed))->toThrow(MissingPermission::class);
 
     $this->voids->voidUnit($this->admin, $this->unit, VoidReason::ContentExposed);
 

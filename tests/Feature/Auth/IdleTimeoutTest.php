@@ -1,6 +1,6 @@
 <?php
 
-use App\Inventory\Access\Role;
+use App\Inventory\Access\Permission;
 use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 
@@ -11,7 +11,8 @@ use Livewire\Livewire;
  */
 
 beforeEach(function () {
-    $this->actingAsPlatformUser(staffMember(Role::Admin), permissions: ['access', 'admin']);
+    $staff = staffInRole('admin');
+    $this->actingAsPlatformUser($staff, permissions: ['access', ...Permission::names($staff->permissions)]);
 });
 
 /**

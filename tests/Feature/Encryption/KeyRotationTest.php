@@ -1,6 +1,5 @@
 <?php
 
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -50,7 +49,7 @@ beforeEach(function () {
     config(['inventory.keys.content' => CONTENT_V1, 'inventory.keys.content_previous' => []]);
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->garena = productOf(
         StockForm::OneTimeCode,

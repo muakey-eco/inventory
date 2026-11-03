@@ -21,11 +21,11 @@ return new class extends Migration
             // Email chỉ là bản sao từ platform, không phải danh tính: một email cũ có thể sang
             // tay người khác.
             $table->string('email')->nullable();
-            // Bản chụp Vai trò theo lần cuối kho thấy nhân viên, danh sách giá trị của `Role`.
-            $table->jsonb('roles')->default('[]');
+            // Bản chụp Quyền theo lần cuối kho thấy nhân viên, danh sách giá trị của `Permission`.
+            $table->jsonb('permissions')->default('[]');
             // Mất quyền theo platform (bị đình chỉ hoặc bị xoá), theo Bản sao danh bạ. Cột riêng,
             // không dùng chung `deactivated_at`: nó tự hết khi platform cấp lại quyền, còn Khoá
-            // nhân viên thì chỉ Quản trị mở được.
+            // nhân viên thì chỉ người có Quyền quản Nhân viên mở được.
             $table->timestampTz('platform_revoked_at')->nullable();
             $table->string('platform_revoked_reason')->nullable();
             // `seq` của bản danh bạ mới nhất đã nhận, để bỏ bản tới trễ hoặc tới lặp.

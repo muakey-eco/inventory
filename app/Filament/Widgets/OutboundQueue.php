@@ -14,7 +14,7 @@ use Filament\Widgets\StatsOverviewWidget;
 
 /**
  * Việc Xuất hàng còn dang dở, trên trang Tổng quan. Tách khỏi {@see IntakeQueue} theo *công việc* chứ
- * không theo Vai trò: một widget mà số ô đổi theo người xem thì bố cục co giãn, nên mỗi công việc một
+ * không theo nhóm Quyền: một widget mà số ô đổi theo người xem thì bố cục co giãn, nên mỗi công việc một
  * widget với canView riêng và số ô cố định.
  *
  * Ba ô Báo lỗi dẫn sang tab có sẵn của danh sách Báo lỗi, không sinh bộ lọc song song nói cùng một thứ.

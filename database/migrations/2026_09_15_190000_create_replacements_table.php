@@ -17,7 +17,7 @@ return new class extends Migration
             $table->boolean('refunded')->default(false);
             $table->foreignId('resolved_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestampTz('resolved_at')->nullable();
-            // Đổi hàng từ lần thứ 3 của chuỗi: Bán hàng yêu cầu, Quản trị duyệt.
+            // Đổi hàng từ lần thứ 3 của chuỗi: người thiếu Quyền Duyệt Đổi hàng xin duyệt, người có Quyền đó duyệt.
             $table->foreignId('replacement_approval_requested_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestampTz('replacement_approval_requested_at')->nullable();
             $table->foreignId('replacement_approved_by')->nullable()->constrained('users')->restrictOnDelete();
@@ -62,7 +62,7 @@ return new class extends Migration
             $table->foreignId('defective_product_id')->constrained('products')->restrictOnDelete();
             $table->foreignId('supplier_id')->constrained()->restrictOnDelete();
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
-            // Quản trị đã duyệt (hoặc tự làm) lần đổi từ thứ 3 của chuỗi.
+            // Người có Quyền Duyệt Đổi hàng đã duyệt (hoặc tự làm) lần đổi từ thứ 3 của chuỗi.
             $table->foreignId('approved_by')->nullable()->constrained('users')->restrictOnDelete();
             // Mốc màn kết quả Đổi hàng đã hiện nội dung; sau đó xem lại qua Xem mã của lần giao.
             $table->timestampTz('result_revealed_at')->nullable();

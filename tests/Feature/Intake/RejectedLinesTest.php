@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -26,8 +25,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
 
     $this->intake = app(BatchIntake::class);
-    $this->admin = staffMember(Role::Admin);
-    $this->clerk = staffMember(Role::Importer);
+    $this->admin = staffInRole('admin');
+    $this->clerk = staffInRole('importer');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->product = productOf(
         StockForm::OneTimeCode,
@@ -161,17 +160,17 @@ it('chỉ người tạo Lô nhập tải được; người khác bị từ ch�
     garenaBatchBy($this->clerk, new BatchLineDraft($this->product, 50_000, "SR002\tabc"));
     $line = BatchLine::sole();
 
-    expect(fn () => $this->intake->rejectedLines(staffMember(Role::Importer), $line))
+    expect(fn () => $this->intake->rejectedLines(staffInRole('importer'), $line))
         ->toThrow(InvalidBatch::class, 'Chỉ người tạo Lô nhập tải được dòng bị bỏ.')
         ->and(fn () => $this->intake->rejectedLines($this->admin, $line))
         ->toThrow(InvalidBatch::class, 'Chỉ người tạo Lô nhập tải được dòng bị bỏ.')
-        ->and(fn () => $this->intake->rejectedLines(staffMember(Role::Sale), $line))
-        ->toThrow(MissingRole::class);
+        ->and(fn () => $this->intake->rejectedLines(staffInRole('sale'), $line))
+        ->toThrow(MissingPermission::class);
 
-    $this->clerk->forceFill(['roles' => []])->save();
+    $this->clerk->forceFill(['permissions' => []])->save();
 
     expect(fn () => $this->intake->rejectedLines($this->clerk->fresh(), $line))
-        ->toThrow(MissingRole::class)
+        ->toThrow(MissingPermission::class)
         ->and(RevealLogEntry::count())->toBe(0);
 });
 

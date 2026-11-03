@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Stock;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Models\Product;
 use App\Models\User;
@@ -25,7 +26,7 @@ use Illuminate\Support\Facades\DB;
 class ContentExposure
 {
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private StockLedger $ledger,
     ) {}
 
@@ -34,11 +35,11 @@ class ContentExposure
      *
      * @param  ?Product  $product  null là cả kho
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function plan(User $actor, ?Product $product): ProductVoidTally
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::ContentExposure);
 
         $units = self::activeUnitIds($product, lock: false);
         $voidable = $units->diff(self::heldUnitIds($units));
@@ -67,12 +68,12 @@ class ContentExposure
      * @param  ?Product  $product  null là cả kho
      * @param  string  $note  bắt buộc: vì sao nội dung bị coi là đã lộ
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidVoid
      */
     public function voidExposed(User $actor, ?Product $product, string $note): ProductVoidTally
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::ContentExposure);
         $note = trim($note);
 
         if ($note === '') {
@@ -120,12 +121,12 @@ class ContentExposure
 
     /**
      * Để panel ẩn nút, không thay cho kiểm tra trong {@see voidExposed()}. Không xét phạm vi: lúc
-     * dựng nút thì Quản trị chưa chọn Sản phẩm, và "không còn gì để huỷ" là câu trả lời của
+     * dựng nút thì nhân viên chưa chọn Sản phẩm, và "không còn gì để huỷ" là câu trả lời của
      * {@see plan()} ngay trên modal.
      */
     public function canVoid(User $actor): bool
     {
-        return $this->roles->allows($actor);
+        return $this->gate->allows($actor, Permission::ContentExposure);
     }
 
     /**

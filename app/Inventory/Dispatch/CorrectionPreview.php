@@ -5,7 +5,7 @@ namespace App\Inventory\Dispatch;
 use Carbon\CarbonImmutable;
 
 /**
- * Tóm tắt cho modal Giao thay: lần giao sẽ bị huỷ, hạn Bán hàng còn Giao thay được và Lần giao bị
+ * Tóm tắt cho modal Giao thay: lần giao sẽ bị huỷ, hạn còn Giao thay được không cần Quyền Vượt hạn và Lần giao bị
  * ảnh hưởng nếu chọn Huỷ hàng cả Đơn vị hàng.
  */
 final readonly class CorrectionPreview

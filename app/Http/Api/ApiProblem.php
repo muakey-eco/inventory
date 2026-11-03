@@ -41,7 +41,7 @@ final class ApiProblem
     }
 
     /**
-     * Kho đang Tạm dừng xuất kho: không giữ hay giao gì cho tới khi Quản trị mở lại. Không kèm lý do
+     * Kho đang Tạm dừng xuất kho: không giữ hay giao gì cho tới khi người có Quyền Tạm dừng xuất kho mở lại. Không kèm lý do
      * tạm dừng — đó là chuyện nội bộ của shop; website chỉ cần biết để ngừng nhận đơn và thử lại sau.
      */
     public static function frozen(): JsonResponse

@@ -1,6 +1,5 @@
 <?php
 
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -31,7 +30,7 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->intake = app(BatchIntake::class);
 });

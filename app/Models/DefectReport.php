@@ -35,9 +35,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property bool $refunded Không đổi vì khách đã được hoàn tiền ngoài kho
  * @property ?int $resolved_by
  * @property ?CarbonImmutable $resolved_at
- * @property ?int $replacement_approval_requested_by Bán hàng yêu cầu Quản trị duyệt Đổi hàng từ lần thứ 3
+ * @property ?int $replacement_approval_requested_by người xin duyệt Đổi hàng từ lần thứ 3
  * @property ?CarbonImmutable $replacement_approval_requested_at
- * @property ?int $replacement_approved_by Quản trị duyệt Đổi hàng từ lần thứ 3
+ * @property ?int $replacement_approved_by người có Quyền Duyệt Đổi hàng duyệt lần đổi từ thứ 3
  * @property ?CarbonImmutable $replacement_approved_at
  * @property CarbonImmutable $created_at
  * @property-read Delivery $delivery
@@ -91,7 +91,7 @@ class DefectReport extends Model
     }
 
     /**
-     * Danh sách Chờ Quản trị duyệt: Báo lỗi Chờ đổi đã được yêu cầu duyệt Đổi hàng, chưa được duyệt.
+     * Danh sách Chờ duyệt: Báo lỗi Chờ đổi đã được yêu cầu duyệt Đổi hàng, chưa được duyệt.
      *
      * @param  Builder<DefectReport>  $query
      */

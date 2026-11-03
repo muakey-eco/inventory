@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Cảnh báo tồn kho trên dashboard: Sản phẩm sắp hết hoặc có hàng hết hạn trong 7 ngày, cùng số liệu
- * với báo cáo Tồn kho. Bán hàng không thấy Giá vốn sắp mất.
+ * với báo cáo Tồn kho. Thiếu Quyền Xem giá vốn và Nhà cung cấp thì không thấy Giá vốn sắp mất.
  */
 class StockAlerts extends TableWidget
 {

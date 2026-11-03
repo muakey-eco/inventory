@@ -8,7 +8,6 @@ use App\Filament\Resources\StockUnits\Pages\ViewStockUnit;
 use App\Filament\Resources\StockUnits\RelationManagers\RevealLogEntriesRelationManager;
 use App\Filament\Resources\StockUnits\RelationManagers\SlotsRelationManager;
 use App\Filament\Resources\StockUnits\StockUnitResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Catalog\SupplierDirectory;
@@ -38,8 +37,8 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->clerk = staffMember(Role::Importer);
+    $this->admin = staffInRole('admin');
+    $this->clerk = staffInRole('importer');
     $this->product = productOf(
         StockForm::OneTimeCode,
         [new ContentFieldDraft('code', 'Mã thẻ', dedupeKey: true)],
@@ -55,14 +54,14 @@ beforeEach(function () {
     ));
 });
 
-it('chỉ Quản trị vào được Nhật ký xem mã', function (Role $role, int $status) {
-    $this->actingAs(staffMember($role))
+it('chỉ Quản trị vào được Nhật ký xem mã', function (string $role, int $status) {
+    $this->actingAs(staffInRole($role))
         ->get(RevealLogEntryResource::getUrl('index'))
         ->assertStatus($status);
 })->with([
-    'Quản trị' => [Role::Admin, 200],
-    'Nhập kho' => [Role::Importer, 403],
-    'Bán hàng' => [Role::Sale, 403],
+    'Quản trị' => ['admin', 200],
+    'Nhập kho' => ['importer', 403],
+    'Bán hàng' => ['sale', 403],
 ]);
 
 it('Quản trị xem nội dung Slot Còn hàng ở chi tiết Đơn vị hàng kèm lý do; lịch sử xem hiện ai, khi nào', function () {
@@ -102,15 +101,15 @@ it('Quản trị xem nội dung Slot Còn hàng ở chi tiết Đơn vị hàng 
         ->assertSee('Khách hỏi lại mã');
 
     $this->get(RevealLogEntryResource::getUrl('index'))
-        ->assertSee('Quản trị xem hàng Còn hàng')
+        ->assertSee('Xem hàng Còn hàng')
         ->assertSee('Khách hỏi lại mã')
         ->assertDontSee('AAAA-BBBB');
 });
 
-it('Nhập kho và Bán hàng mở chi tiết Đơn vị hàng nhưng không có nút xem nội dung, không thấy lịch sử xem', function (Role $role) {
+it('Nhập kho và Bán hàng mở chi tiết Đơn vị hàng nhưng không có nút xem nội dung, không thấy lịch sử xem', function (string $role) {
     app(BatchIntake::class)->confirm($this->clerk, $this->batch);
     $unit = StockUnit::sole();
-    $this->actingAs(staffMember($role));
+    $this->actingAs(staffInRole($role));
 
     $this->get(StockUnitResource::getUrl('view', ['record' => $unit]))
         ->assertOk()
@@ -121,8 +120,8 @@ it('Nhập kho và Bán hàng mở chi tiết Đơn vị hàng nhưng không có
 
     expect(RevealLogEntriesRelationManager::canViewForRecord($unit, ViewStockUnit::class))->toBeFalse();
 })->with([
-    'Nhập kho' => [Role::Importer],
-    'Bán hàng' => [Role::Sale],
+    'Nhập kho' => ['importer'],
+    'Bán hàng' => ['sale'],
 ]);
 
 it('Quản trị không thấy nút xem nội dung trên Slot đã rời Còn hàng', function () {
@@ -141,7 +140,7 @@ it('Quản trị thấy Đã được xem bởi trên trang Phiếu xuất: mọ
     // Lượt xem lúc hàng còn trong kho: Ngữ cảnh không phải Giao hàng nhưng vẫn là đã thấy mã của Slot.
     $reveal->reveal(RevealActor::staff($this->admin), Slot::sole(), RevealContext::inStock(), 'Khách hỏi lại mã');
 
-    $seller = staffMember(Role::Sale);
+    $seller = staffInRole('sale');
     $channel = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Zalo'));
     $dispatch = app(ManualDispatch::class)->create($seller, new DispatchDraft($channel, 'SP-001', [new DispatchLineDraft($this->product, 1)], 'Anh Minh'));
     $delivery = $dispatch->deliveries()->firstOrFail();
@@ -165,14 +164,14 @@ it('Quản trị thấy Đã được xem bởi trên trang Phiếu xuất: mọ
 
     Livewire::test(DispatchRevealLogEntries::class, ['record' => $dispatch])
         ->assertCanSeeTableRecords(RevealLogEntry::where('slot_id', $delivery->slot_id)->get())
-        ->assertSee(['Quản trị xem hàng Còn hàng', 'Giao hàng', 'Khách hỏi lại mã', $this->admin->name, $seller->name])
+        ->assertSee(['Xem hàng Còn hàng', 'Giao hàng', 'Khách hỏi lại mã', $this->admin->name, $seller->name])
         ->assertDontSee('Kiểm tra hàng khác')
         ->assertDontSee('AAAA-BBBB');
 });
 
 it('Bán hàng và Nhập kho không thấy Đã được xem bởi trên trang Phiếu xuất', function () {
     app(BatchIntake::class)->confirm($this->clerk, $this->batch);
-    $seller = staffMember(Role::Sale);
+    $seller = staffInRole('sale');
     $channel = app(SalesChannelDirectory::class)->create($this->admin, new SalesChannelDraft('Zalo'));
     $dispatch = app(ManualDispatch::class)->create($seller, new DispatchDraft($channel, 'SP-001', [new DispatchLineDraft($this->product, 1)], 'Anh Minh'));
     app(ContentReveal::class)->revealDelivery($seller, $dispatch->deliveries()->firstOrFail());

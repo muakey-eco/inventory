@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\ProductCatalog;
@@ -41,9 +40,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
     $this->report = app(StockReport::class);
 
     $this->netflix = productOf(
@@ -189,7 +188,7 @@ it('tổng cho ô số trên Tổng quan cộng đúng các dòng, và đi theo 
 it('Bán hàng lấy được tổng; nhân viên không có vai trò thì không', function () {
     expect($this->report->totals($this->seller, new StockReportFilter)->sellableSlots)->toBe(3);
 
-    expect(fn () => $this->report->totals(staffMember(), new StockReportFilter))->toThrow(MissingRole::class);
+    expect(fn () => $this->report->totals(staffMember(), new StockReportFilter))->toThrow(MissingPermission::class);
 });
 
 it('Tồn bán được dùng chung định nghĩa với form xuất kho', function () {
@@ -320,10 +319,10 @@ it('cả ba vai trò xem được; Bán hàng không thấy cột giá trị và
     expect($this->report->seesCost($this->seller))->toBeFalse()
         ->and(array_keys($this->report->columns($this->seller, new StockReportFilter)))->not->toContain(...$valueColumns)
         ->and($this->report->rows($this->seller, new StockReportFilter))->toHaveCount(2)
-        ->and(fn () => $this->report->rows($this->seller, new StockReportFilter(supplierId: $this->g2a->id)))->toThrow(MissingRole::class);
+        ->and(fn () => $this->report->rows($this->seller, new StockReportFilter(supplierId: $this->g2a->id)))->toThrow(MissingPermission::class);
 
     $this->seller->forceFill(['deactivated_at' => now()])->save();
-    expect(fn () => $this->report->rows($this->seller, new StockReportFilter))->toThrow(MissingRole::class);
+    expect(fn () => $this->report->rows($this->seller, new StockReportFilter))->toThrow(MissingPermission::class);
 });
 
 it('xuất CSV áp cột theo vai trò, không ghi Nhật ký xem mã hay Nhật ký bảo mật', function () {

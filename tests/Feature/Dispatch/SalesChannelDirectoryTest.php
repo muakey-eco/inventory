@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Api\ApiKeys;
 use App\Inventory\Dispatch\InvalidSalesChannel;
 use App\Inventory\Dispatch\SalesChannelDirectory;
@@ -11,7 +10,7 @@ use App\Models\SalesChannel;
 
 beforeEach(function () {
     $this->channels = app(SalesChannelDirectory::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
 });
 
 it('Quản trị khai báo Kênh bán thủ công với cờ bắt buộc mã đơn ngoài', function () {
@@ -26,18 +25,18 @@ it('Quản trị khai báo Kênh bán thủ công với cờ bắt buộc mã đ
         ->and($zalo->fresh()->requires_external_ref)->toBeFalse();
 });
 
-it('chỉ Quản trị khai báo, sửa và ẩn được Kênh bán', function (Role $role) {
+it('chỉ Quản trị khai báo, sửa và ẩn được Kênh bán', function (string $role) {
     $channel = $this->channels->create($this->admin, new SalesChannelDraft('Shopee'));
-    $staff = staffMember($role);
+    $staff = staffInRole($role);
 
-    expect(fn () => $this->channels->create($staff, new SalesChannelDraft('Zalo')))->toThrow(MissingRole::class)
-        ->and(fn () => $this->channels->update($staff, $channel, new SalesChannelDraft('Shopee Mall')))->toThrow(MissingRole::class)
-        ->and(fn () => $this->channels->hide($staff, $channel))->toThrow(MissingRole::class)
+    expect(fn () => $this->channels->create($staff, new SalesChannelDraft('Zalo')))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->channels->update($staff, $channel, new SalesChannelDraft('Shopee Mall')))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->channels->hide($staff, $channel))->toThrow(MissingPermission::class)
         ->and(SalesChannel::count())->toBe(1)
         ->and($channel->fresh()->isHidden())->toBeFalse();
 })->with([
-    'Nhập kho' => [Role::Importer],
-    'Bán hàng' => [Role::Sale],
+    'Nhập kho' => ['importer'],
+    'Bán hàng' => ['sale'],
 ]);
 
 it('tên Kênh bán bắt buộc và duy nhất, không phân biệt hoa thường', function () {

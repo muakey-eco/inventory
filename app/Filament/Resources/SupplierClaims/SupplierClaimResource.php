@@ -36,7 +36,7 @@ use UnitEnum;
 /**
  * Khiếu nại nhà cung cấp trong panel. Adapter mỏng: tạo, sửa Nháp, gửi, giải quyết và huỷ gọi
  * SupplierClaims; Xem mã gọi ContentReveal. Danh sách kèm bảng Đơn vị hàng Lỗi chưa khiếu nại. Nội
- * dung luôn dạng che. Bán hàng không thấy.
+ * dung luôn dạng che. Cần Quyền Khiếu nại nhà cung cấp.
  */
 class SupplierClaimResource extends Resource
 {

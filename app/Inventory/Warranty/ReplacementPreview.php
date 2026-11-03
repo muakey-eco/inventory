@@ -11,7 +11,7 @@ use Carbon\CarbonImmutable;
 final readonly class ReplacementPreview
 {
     /**
-     * @param  bool  $requiresApproval  lần đổi này từ thứ {@see ReplacementDelivery::APPROVAL_SEQUENCE}: Bán hàng cần Quản trị duyệt
+     * @param  bool  $requiresApproval  lần đổi này từ thứ {@see ReplacementDelivery::APPROVAL_SEQUENCE}: cần người có Quyền Duyệt Đổi hàng duyệt
      * @param  ?CarbonImmutable  $candidateExpiresOn  Hạn sử dụng của Slot sẽ chọn; null khi Slot không có hạn hoặc hết hàng
      */
     public function __construct(

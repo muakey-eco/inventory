@@ -2,47 +2,48 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\Product;
 use App\Models\User;
 
 /**
- * Sản phẩm: mọi Vai trò xem được; chỉ Quản trị cấu hình, Ngừng bán và xoá.
+ * Sản phẩm: Quyền Xem hàng và báo cáo tồn để xem; Quyền Quản lý Sản phẩm và Loại sản phẩm để
+ * cấu hình, Ngừng bán và xoá.
  * Quy tắc thật (khoá cấu hình, chặn xoá khi có hàng) nằm trong ProductCatalog.
  */
 class ProductPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     public function view(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Admin);
+        return $this->gate->allows($user, Permission::CatalogManage);
     }
 
     public function update(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Admin);
+        return $this->gate->allows($user, Permission::CatalogManage);
     }
 
     public function discontinue(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Admin) && ! $product->isDiscontinued();
+        return $this->gate->allows($user, Permission::CatalogManage) && ! $product->isDiscontinued();
     }
 
     public function delete(User $user, Product $product): bool
     {
-        return $this->roles->allows($user, Role::Admin) && ! $product->hasStock();
+        return $this->gate->allows($user, Permission::CatalogManage) && ! $product->hasStock();
     }
 
     public function deleteAny(User $user): bool

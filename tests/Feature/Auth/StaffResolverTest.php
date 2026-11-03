@@ -27,7 +27,7 @@ it('lần đầu đăng nhập thì tạo nhân viên chưa có Vai trò, ghi xu
         'name' => 'An Nguyễn',
         'email' => 'an@shop.test',
     ])
-        ->and($staff->fresh()->roles->all())->toBe([])
+        ->and($staff->fresh()->permissions->all())->toBe([])
         ->and(SecurityLogEntry::orderBy('id')->pluck('event')->all())->toBe([
             SecurityEvent::StaffFirstSeen,
             SecurityEvent::LoginSucceeded,

@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\InvalidProductConfiguration;
@@ -16,7 +15,7 @@ use App\Models\Product;
 
 beforeEach(function () {
     $this->catalog = app(ProductCatalog::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->accountType = productTypeOf(StockForm::Account, [
         new ContentFieldDraft('username', 'Tên đăng nhập', ContentFieldType::Email, dedupeKey: true),
         new ContentFieldDraft('password', 'Mật khẩu'),
@@ -65,14 +64,14 @@ it('mọi Sản phẩm cùng Loại đọc ra đúng một bộ Trường nội 
         ->toBe($spotify->fresh()->contentFields->pluck('id')->all());
 });
 
-it('chỉ Quản trị tạo được Sản phẩm', function (Role $role) {
-    expect(fn () => $this->catalog->create(staffMember($role), netflixDraft()))
-        ->toThrow(MissingRole::class);
+it('chỉ Quản trị tạo được Sản phẩm', function (string $role) {
+    expect(fn () => $this->catalog->create(staffInRole($role), netflixDraft()))
+        ->toThrow(MissingPermission::class);
 
     expect(Product::count())->toBe(0);
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);
 
 it('từ chối cấu hình Sản phẩm không hợp lệ', function (ProductDraft $draft) {
@@ -136,16 +135,16 @@ it('sửa Sản phẩm vẫn kiểm tra cấu hình và cho giữ nguyên Mã s�
     expect($product->fresh()->code)->toBe('NETFLIX-1M');
 });
 
-it('chỉ Quản trị sửa được Sản phẩm', function (Role $role) {
+it('chỉ Quản trị sửa được Sản phẩm', function (string $role) {
     $product = $this->catalog->create($this->admin, netflixDraft());
 
-    expect(fn () => $this->catalog->update(staffMember($role), $product, netflixDraft(name: 'Đổi tên')))
-        ->toThrow(MissingRole::class);
+    expect(fn () => $this->catalog->update(staffInRole($role), $product, netflixDraft(name: 'Đổi tên')))
+        ->toThrow(MissingPermission::class);
 
     expect($product->fresh()->name)->toBe('Netflix Premium 1 tháng');
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);
 
 it('Sản phẩm chưa có hàng chuyển được sang Loại sản phẩm khác', function () {
@@ -253,16 +252,16 @@ it('Quản trị Ngừng bán Sản phẩm', function () {
     expect($product->fresh()->isDiscontinued())->toBeTrue();
 });
 
-it('chỉ Quản trị Ngừng bán được Sản phẩm', function (Role $role) {
+it('chỉ Quản trị Ngừng bán được Sản phẩm', function (string $role) {
     $product = $this->catalog->create($this->admin, netflixDraft());
 
-    expect(fn () => $this->catalog->discontinue(staffMember($role), $product))
-        ->toThrow(MissingRole::class);
+    expect(fn () => $this->catalog->discontinue(staffInRole($role), $product))
+        ->toThrow(MissingPermission::class);
 
     expect($product->fresh()->isDiscontinued())->toBeFalse();
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);
 
 it('Quản trị xoá được Sản phẩm chưa có hàng', function () {
@@ -283,14 +282,14 @@ it('Sản phẩm đã có hàng không xoá được, chỉ Ngừng bán', funct
     expect(Product::find($product->id))->not->toBeNull();
 });
 
-it('chỉ Quản trị xoá được Sản phẩm', function (Role $role) {
+it('chỉ Quản trị xoá được Sản phẩm', function (string $role) {
     $product = $this->catalog->create($this->admin, netflixDraft());
 
-    expect(fn () => $this->catalog->delete(staffMember($role), $product))
-        ->toThrow(MissingRole::class);
+    expect(fn () => $this->catalog->delete(staffInRole($role), $product))
+        ->toThrow(MissingPermission::class);
 
     expect(Product::find($product->id))->not->toBeNull();
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);

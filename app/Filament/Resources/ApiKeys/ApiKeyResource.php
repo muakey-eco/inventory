@@ -30,7 +30,7 @@ use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 /**
- * Khoá API trong panel, chỉ Quản trị. Adapter mỏng: tạo, xoay và thu hồi đều gọi {@see ApiKeys},
+ * Khoá API trong panel, chỉ người có Quyền Quản lý Khoá API. Adapter mỏng: tạo, xoay và thu hồi đều gọi {@see ApiKeys},
  * nơi ghi Nhật ký bảo mật. Giá trị khoá chỉ hiện đúng một lần, ngay sau khi tạo hoặc xoay.
  */
 class ApiKeyResource extends Resource

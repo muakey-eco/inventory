@@ -32,7 +32,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 /**
- * Báo cáo Nhập/xuất. Adapter mỏng: số liệu, quyền và cột theo Vai trò nằm ở MovementReport; bộ lọc
+ * Báo cáo Nhập/xuất. Adapter mỏng: số liệu, quyền và cột theo Quyền nằm ở MovementReport; bộ lọc
  * của bảng chỉ giữ trạng thái để dựng MovementReportFilter (các bộ lọc đổi cách đếm nên không áp
  * lên truy vấn sau khi đếm). Bộ lọc nằm trên URL để chia sẻ được một kỳ báo cáo.
  */
@@ -72,7 +72,7 @@ class MovementReportPage extends Page implements HasTable
     {
         $report = app(MovementReport::class);
         $values = $report->seesValues(InventoryAction::actor());
-        // Cột nào hiện là việc của MovementReport::columns() (Vai trò và bộ lọc); panel chỉ hỏi.
+        // Cột nào hiện là việc của MovementReport::columns() (Quyền và bộ lọc); panel chỉ hỏi.
         $shows = fn (string $column): bool => array_key_exists($column, $report->columns(InventoryAction::actor(), $this->reportFilter()));
         $count = fn (string $column, string $label): TextColumn => TextColumn::make($column)
             ->label($label)

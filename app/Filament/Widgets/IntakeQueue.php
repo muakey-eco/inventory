@@ -14,7 +14,7 @@ use Filament\Widgets\StatsOverviewWidget;
 
 /**
  * Việc Nhập hàng còn dang dở, trên trang Tổng quan. Xem {@see OutboundQueue} về lý do tách theo công
- * việc chứ không theo Vai trò.
+ * việc chứ không theo nhóm Quyền.
  */
 class IntakeQueue extends StatsOverviewWidget
 {

@@ -27,7 +27,7 @@ use Filament\Tables\Table;
 use UnitEnum;
 
 /**
- * Kênh bán trong panel, chỉ Quản trị. Adapter mỏng: mọi thao tác gọi SalesChannelDirectory.
+ * Kênh bán trong panel, chỉ người có Quyền Quản lý Kênh bán. Adapter mỏng: mọi thao tác gọi SalesChannelDirectory.
  * Kênh loại API có thêm hạn Giữ hàng và cờ bắt buộc Giá bán; Khoá API của kênh quản lý ở
  * {@see ApiKeyResource}.
  */

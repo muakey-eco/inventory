@@ -50,8 +50,9 @@ return [
     |
     | Số Slot tối đa của một Phiếu xuất (tổng mọi Dòng xuất). Phiếu có từ `result_mask_slots`
     | Slot trở lên thì màn kết quả chỉ hiện dạng che. Người tạo phiếu Copy tất cả (khi dạng che)
-    | và tải TXT/CSV trong `result_download_minutes` phút sau khi màn kết quả hiện. Bán hàng
-    | Giao thay trong `corrective_hours` giờ kể từ lúc giao; quá hạn chỉ Quản trị kèm lý do.
+    | và tải TXT/CSV trong `result_download_minutes` phút sau khi màn kết quả hiện. Người có
+    | Quyền Xuất hàng Giao thay trong `corrective_hours` giờ kể từ lúc giao; quá hạn phải có thêm
+    | Quyền Vượt hạn, kèm lý do.
     |
     */
 

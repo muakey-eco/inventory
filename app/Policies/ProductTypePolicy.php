@@ -2,48 +2,49 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\ProductType;
 use App\Models\User;
 
 /**
- * Loại sản phẩm: mọi Vai trò xem được; chỉ Quản trị khai báo, Ngừng dùng và xoá.
+ * Loại sản phẩm: Quyền Xem hàng và báo cáo tồn để xem; Quyền Quản lý Sản phẩm và Loại sản phẩm
+ * để khai báo, Ngừng dùng và xoá.
  * Quy tắc thật (từ chối trọn gói khi đã có hàng, chặn xoá khi có Sản phẩm) nằm trong
  * ProductTypeCatalog.
  */
 class ProductTypePolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     public function view(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Admin);
+        return $this->gate->allows($user, Permission::CatalogManage);
     }
 
     public function update(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Admin);
+        return $this->gate->allows($user, Permission::CatalogManage);
     }
 
     public function discontinue(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Admin) && ! $type->isDiscontinued();
+        return $this->gate->allows($user, Permission::CatalogManage) && ! $type->isDiscontinued();
     }
 
     public function delete(User $user, ProductType $type): bool
     {
-        return $this->roles->allows($user, Role::Admin) && $type->products()->doesntExist();
+        return $this->gate->allows($user, Permission::CatalogManage) && $type->products()->doesntExist();
     }
 
     public function deleteAny(User $user): bool

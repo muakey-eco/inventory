@@ -3,8 +3,7 @@
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\StockUnits\Pages\ViewStockUnit;
 use App\Filament\Resources\StockUnits\RelationManagers\SlotsRelationManager;
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -45,8 +44,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->defects = app(StockDefect::class);
     $this->stock = app(SellableStock::class);
     $this->netflix = productOf(
@@ -164,7 +163,7 @@ it('chỉ Quản trị Đánh dấu Lỗi và Khôi phục; lý do bắt buộc;
     expect($this->defects->canMarkDefective($this->admin, $this->unit))->toBeTrue()
         ->and($this->defects->canMarkDefective($this->seller, $this->unit))->toBeFalse()
         ->and($this->defects->canRestore($this->admin, $this->unit))->toBeFalse()
-        ->and(fn () => $this->defects->markDefective($this->seller, $this->unit, 'Hỏng'))->toThrow(MissingRole::class)
+        ->and(fn () => $this->defects->markDefective($this->seller, $this->unit, 'Hỏng'))->toThrow(MissingPermission::class)
         ->and(fn () => $this->defects->markDefective($this->admin, $this->unit, '   '))->toThrow(InvalidDefectMarking::class, 'Đánh dấu Lỗi phải nhập lý do.')
         ->and(fn () => $this->defects->restore($this->admin, $this->unit, 'Sửa xong'))->toThrow(InvalidDefectMarking::class, 'Chỉ Khôi phục được Đơn vị hàng Lỗi.')
         ->and($this->unit->fresh()->status)->toBe(StockUnitStatus::Active);
@@ -174,7 +173,7 @@ it('chỉ Quản trị Đánh dấu Lỗi và Khôi phục; lý do bắt buộc;
     expect($this->defects->canMarkDefective($this->admin, $this->unit->fresh()))->toBeFalse()
         ->and($this->defects->canRestore($this->admin, $this->unit->fresh()))->toBeTrue()
         ->and($this->defects->canRestore($this->seller, $this->unit->fresh()))->toBeFalse()
-        ->and(fn () => $this->defects->restore($this->seller, $this->unit, 'Sửa xong'))->toThrow(MissingRole::class)
+        ->and(fn () => $this->defects->restore($this->seller, $this->unit, 'Sửa xong'))->toThrow(MissingPermission::class)
         ->and(fn () => $this->defects->restore($this->admin, $this->unit, ''))->toThrow(InvalidDefectMarking::class, 'Khôi phục phải nhập lý do.')
         ->and(fn () => $this->defects->markDefective($this->admin, $this->unit, 'Hỏng'))->toThrow(InvalidDefectMarking::class, 'Chỉ Đánh dấu Lỗi được Đơn vị hàng Hoạt động.');
 

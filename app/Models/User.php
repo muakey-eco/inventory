@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Inventory\Access\Role;
+use App\Inventory\Access\Permission;
 use App\Inventory\Staff\PlatformRevocation;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
@@ -16,11 +16,11 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 
 /**
- * Nhân viên của shop. Danh tính, tên, email và Vai trò lấy từ platform (ADR 0011).
+ * Nhân viên của shop. Danh tính, tên, email và Quyền lấy từ platform (ADR 0011, ADR 0012).
  *
  * @property string $platform_user_id
  * @property ?string $email
- * @property Collection<int, Role> $roles Bản chụp Vai trò theo lần cuối kho thấy nhân viên này.
+ * @property Collection<int, Permission> $permissions Bản chụp Quyền theo lần cuối kho thấy nhân viên này.
  * @property ?CarbonImmutable $deactivated_at
  * @property ?CarbonImmutable $platform_revoked_at
  * @property ?PlatformRevocation $platform_revoked_reason
@@ -33,12 +33,12 @@ class User extends Authenticatable implements FilamentUser
     use HasFactory, Notifiable;
 
     /**
-     * Nhân viên mới chưa có bản chụp Vai trò nào, như default của cột.
+     * Nhân viên mới chưa có bản chụp Quyền nào, như default của cột.
      *
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'roles' => '[]',
+        'permissions' => '[]',
     ];
 
     /**
@@ -49,7 +49,7 @@ class User extends Authenticatable implements FilamentUser
     protected function casts(): array
     {
         return [
-            'roles' => AsEnumCollection::of(Role::class),
+            'permissions' => AsEnumCollection::of(Permission::class),
             'deactivated_at' => 'immutable_datetime',
             'platform_revoked_at' => 'immutable_datetime',
             'platform_revoked_reason' => PlatformRevocation::class,
@@ -57,7 +57,7 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Nhân viên đã bị Khoá nhân viên: không đăng nhập được, không qua kiểm tra Vai trò nào.
+     * Nhân viên đã bị Khoá nhân viên: không đăng nhập được, không qua kiểm tra Quyền nào.
      */
     public function isDeactivated(): bool
     {

@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Pages\DefectRateReportPage;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -26,9 +25,9 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
 
     $this->netflix = productOf(
         StockForm::Account,
@@ -75,14 +74,14 @@ beforeEach(function () {
     $this->totalRow = "nha-cung-cap-{$this->kinguin->id}-tong";
 });
 
-it('chỉ Quản trị và Nhập kho vào được báo cáo Tỉ lệ lỗi', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
+it('chỉ Quản trị và Nhập kho vào được báo cáo Tỉ lệ lỗi', function (?string $role, bool $sees) {
+    $this->actingAs($role === null ? User::factory()->create() : staffInRole($role));
 
     $this->get(DefectRateReportPage::getUrl())->assertStatus($sees ? 200 : 403);
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', false],
     'không vai trò' => [null, false],
 ]);
 

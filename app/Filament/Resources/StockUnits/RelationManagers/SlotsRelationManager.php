@@ -4,8 +4,8 @@ namespace App\Filament\Resources\StockUnits\RelationManagers;
 
 use App\Filament\Resources\StockUnits\StockUnitResource;
 use App\Filament\Support\InventoryAction;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Reveal\ContentReveal;
 use App\Inventory\Reveal\RevealActor;
 use App\Inventory\Reveal\RevealContext;
@@ -24,7 +24,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Slot của một Đơn vị hàng. Quản trị xem nội dung Slot Còn hàng kèm lý do tự do qua
+ * Slot của một Đơn vị hàng. Người có Quyền Xem hàng Còn hàng xem nội dung Slot Còn hàng kèm lý do tự do qua
  * ContentReveal. Nội dung chỉ nằm trong tham số của modal vừa mở: không lưu ở server (không qua
  * session hay thông báo), nhưng đi trong snapshot Livewire (không mã hoá) tới trình duyệt và
  * quay lại theo mỗi request cho tới khi modal đóng.
@@ -59,7 +59,7 @@ class SlotsRelationManager extends RelationManager
                 TextColumn::make('cost')
                     ->label('Giá vốn')
                     ->formatStateUsing(fn (int $state): string => number_format($state, 0, ',', '.').' ₫')
-                    ->visible(fn (): bool => app(RoleGate::class)->allows(InventoryAction::actor(), Role::Importer)),
+                    ->visible(fn (): bool => app(PermissionGate::class)->allows(InventoryAction::actor(), Permission::CostView)),
             ])
             ->recordActions([
                 Action::make('reveal')

@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -34,7 +33,7 @@ beforeEach(function () {
 
     $this->intake = app(BatchIntake::class);
     $this->reversal = app(ImportReversal::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
 
     $this->codes = productOf(
@@ -220,16 +219,16 @@ it('Slot bị Huỷ nhập không xem được nội dung', function () {
         ->toThrow(InvalidReveal::class);
 });
 
-it('chỉ Quản trị Huỷ nhập được', function (Role $role) {
+it('chỉ Quản trị Huỷ nhập được', function (string $role) {
     $batch = confirmedReversalBatch([[$this->codes, 'AAAA-BBBB']]);
-    $staff = staffMember($role);
+    $staff = staffInRole($role);
 
-    expect(fn () => $this->reversal->plan($staff, $batch))->toThrow(MissingRole::class)
-        ->and(fn () => $this->reversal->reverse($staff, $batch))->toThrow(MissingRole::class)
+    expect(fn () => $this->reversal->plan($staff, $batch))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->reversal->reverse($staff, $batch))->toThrow(MissingPermission::class)
         ->and(StockUnit::sole()->status)->toBe(StockUnitStatus::Active);
 })->with([
-    'Nhập kho' => [Role::Importer],
-    'Bán hàng' => [Role::Sale],
+    'Nhập kho' => ['importer'],
+    'Bán hàng' => ['sale'],
 ]);
 
 it('từ chối Huỷ nhập Lô nhập chưa xác nhận hoặc không còn gì để huỷ', function () {

@@ -31,7 +31,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 /**
- * Báo cáo Tồn kho. Adapter mỏng: số liệu, quyền và cột theo Vai trò nằm ở StockReport; bộ lọc của
+ * Báo cáo Tồn kho. Adapter mỏng: số liệu, quyền và cột theo Quyền nằm ở StockReport; bộ lọc của
  * bảng chỉ giữ trạng thái để dựng StockReportFilter (lọc theo Nhà cung cấp đổi cách đếm nên không
  * áp lên truy vấn sau khi đếm). Bộ lọc nằm trên URL để widget cảnh báo mở sẵn.
  */

@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Reveal;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\ApiDelivery;
 use App\Inventory\Dispatch\ApiDeliveryStatus;
 use App\Inventory\Dispatch\DeliveredContent;
@@ -45,7 +45,7 @@ use Illuminate\Support\Facades\DB;
 class ContentReveal
 {
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private KeyFingerprints $fingerprints,
         private ContentCrypto $crypto,
         private RevealLog $log,
@@ -55,7 +55,7 @@ class ContentReveal
     /**
      * @param  ?string  $reason  lý do tự do; chỉ dùng khi ngữ cảnh không tự suy ra lý do
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
@@ -98,13 +98,13 @@ class ContentReveal
      * Từ ngưỡng che trở lên chỉ trả dạng che, không giải mã và không ghi nhật ký; nội dung
      * đầy đủ lấy qua {@see copyAllDispatchResult()} hoặc {@see exportDispatchResult()}.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
     public function revealDispatchResult(User $actor, Dispatch $dispatch): DispatchResultContent
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $dispatch): DispatchResultContent {
@@ -147,7 +147,7 @@ class ContentReveal
      * Tải TXT (theo Mẫu giao hàng) hoặc CSV từ màn kết quả. Chỉ người vừa xuất kho, trong thời hạn
      * tải ngay sau khi màn kết quả hiện; mỗi lần tải ghi Nhật ký xem mã cho mọi Slot.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
@@ -165,7 +165,7 @@ class ContentReveal
      * Copy tất cả từ màn kết quả dạng che: tin nhắn theo Mẫu giao hàng của mọi Slot, có dòng phân
      * cách. Cùng điều kiện với tải file; ghi Nhật ký xem mã cho mọi Slot.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
@@ -187,13 +187,13 @@ class ContentReveal
      * @param  callable(list<DeliveredContent>): T  $build
      * @return T
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
     private function revealAfterResult(User $actor, Dispatch $dispatch, string $reason, callable $build): mixed
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $dispatch, $reason, $build): mixed {
@@ -212,17 +212,17 @@ class ContentReveal
     }
 
     /**
-     * Xem lại mã của một lần Giao hàng để gửi lại cho khách, đã ghép Mẫu giao hàng. Bán hàng xem
-     * được mọi Phiếu xuất trong Hạn bảo hành; quá hạn chỉ Quản trị. Mỗi lần ghi một dòng Nhật ký
+     * Xem lại mã của một lần Giao hàng để gửi lại cho khách, đã ghép Mẫu giao hàng. Quyền Xuất hàng
+     * xem được mọi Phiếu xuất trong Hạn bảo hành; quá hạn cần thêm Quyền Vượt hạn. Mỗi lần ghi một dòng Nhật ký
      * xem mã ngữ cảnh Giao hàng.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
     public function revealDelivery(User $actor, Delivery $delivery): DeliveredContent
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::Dispatch);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $delivery): DeliveredContent {
@@ -234,7 +234,7 @@ class ContentReveal
 
             if (! $this->canRevealDelivery($actor, $current)) {
                 throw new InvalidReveal(sprintf(
-                    'Lần giao đã quá Hạn bảo hành %s; chỉ Quản trị xem được mã.',
+                    'Lần giao đã quá Hạn bảo hành %s; chỉ người có Quyền Vượt hạn xem được mã.',
                     $current->warrantyEndsOn()->format(DeliveryTemplate::DATE_FORMAT),
                 ));
             }
@@ -248,7 +248,7 @@ class ContentReveal
     /**
      * Các lần Giao hàng của một Phiếu xuất qua API, cho website hiển thị theo cách của nó. Tác nhân
      * là Khoá API chứ không phải nhân viên: quyền đã kiểm ở tầng HTTP khi xác thực khoá, nên ở đây
-     * không có Vai trò nào để kiểm.
+     * không có Quyền nào để kiểm.
      *
      * Lần giao nào cũng được liệt kê kèm trạng thái, nhưng **nội dung** chỉ trả cho lần giao còn
      * hiệu lực và còn trong Hạn bảo hành, và chỉ những lần ấy mới ghi Nhật ký xem mã:
@@ -312,27 +312,27 @@ class ContentReveal
     }
 
     /**
-     * Nhân viên có được Xem mã lần giao này lúc này không: Quản trị luôn được, Bán hàng trong Hạn
-     * bảo hành (tính cả ngày hết hạn). Để panel ẩn nút xem, không thay cho kiểm tra trong
+     * Nhân viên có được Xem mã lần giao này lúc này không: cần Quyền Xuất hàng, trong Hạn bảo
+     * hành (tính cả ngày hết hạn) hoặc có thêm Quyền Vượt hạn. Để panel ẩn nút xem, không thay cho kiểm tra trong
      * {@see revealDelivery()}.
      */
     public function canRevealDelivery(User $actor, Delivery $delivery): bool
     {
-        return $this->roles->allows($actor)
-            || ($this->roles->allows($actor, Role::Sale) && ! CarbonImmutable::today()->gt($delivery->warrantyEndsOn()));
+        return $this->gate->allows($actor, Permission::Dispatch)
+            && (! CarbonImmutable::today()->gt($delivery->warrantyEndsOn()) || $this->gate->allows($actor, Permission::DeadlineOverride));
     }
 
     /**
-     * Xem mã để xác minh một Báo lỗi Chờ xác minh, đã ghép Mẫu giao hàng. Bán hàng và Quản trị; mỗi
-     * lần ghi một dòng Nhật ký xem mã ngữ cảnh Báo lỗi.
+     * Xem mã để xác minh một Báo lỗi Chờ xác minh, đã ghép Mẫu giao hàng. Cần Quyền Báo lỗi và Đổi
+     * hàng; mỗi lần ghi một dòng Nhật ký xem mã ngữ cảnh Báo lỗi.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
     public function revealDefectReport(User $actor, DefectReport $report): DeliveredContent
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $report): DeliveredContent {
@@ -358,13 +358,13 @@ class ContentReveal
      * Đổi hàng và chỉ một lần: ghi Nhật ký xem mã ngữ cảnh Đổi hàng trong cùng transaction với việc
      * đánh dấu màn kết quả đã hiện. Xem lại sau đó qua {@see revealDelivery()}.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
     public function revealReplacement(User $actor, Replacement $replacement): DeliveredContent
     {
-        $this->roles->authorize($actor, Role::Sale);
+        $this->gate->authorize($actor, Permission::DefectReport);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $replacement): DeliveredContent {
@@ -391,17 +391,17 @@ class ContentReveal
     }
 
     /**
-     * Xem nội dung một Đơn vị hàng trong Khiếu nại nhà cung cấp để gửi bằng chứng. Quản trị và Nhập
-     * kho, khi Đơn vị hàng còn nằm trong khiếu nại (chưa gỡ, khiếu nại chưa huỷ); mỗi lần ghi một dòng
+     * Xem nội dung một Đơn vị hàng trong Khiếu nại nhà cung cấp để gửi bằng chứng. Cần Quyền Khiếu
+     * nại nhà cung cấp, khi Đơn vị hàng còn nằm trong khiếu nại (chưa gỡ, khiếu nại chưa huỷ); mỗi lần ghi một dòng
      * Nhật ký xem mã ngữ cảnh Khiếu nại nhà cung cấp cho mỗi Slot của Đơn vị hàng.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      * @throws KeyFingerprintMismatch
      */
     public function revealClaimUnit(User $actor, SupplierClaimUnit $claimUnit): RevealedContent
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierClaim);
         $this->fingerprints->verify();
 
         return DB::transaction(function () use ($actor, $claimUnit): RevealedContent {
@@ -414,7 +414,7 @@ class ContentReveal
 
             $unit = $current->stockUnit()->with(['product.contentFields', 'product.productType'])->firstOrFail();
 
-            // Đã Khôi phục thì là hàng bán được: chỉ Quản trị xem kèm lý do.
+            // Đã Khôi phục thì là hàng bán được: chỉ người có Quyền Xem hàng Còn hàng xem kèm lý do.
             if ($unit->status !== StockUnitStatus::Defective) {
                 throw new InvalidReveal('Đơn vị hàng không còn Lỗi; không xem mã qua Khiếu nại được.');
             }
@@ -435,7 +435,7 @@ class ContentReveal
      */
     public function canRevealClaimUnit(User $actor, SupplierClaimUnit $claimUnit): bool
     {
-        return $this->roles->allows($actor, Role::Importer)
+        return $this->gate->allows($actor, Permission::SupplierClaim)
             && $claimUnit->active
             && $claimUnit->stockUnit->status === StockUnitStatus::Defective;
     }
@@ -534,26 +534,26 @@ class ContentReveal
     }
 
     /**
-     * Nhân viên có được xem nội dung Slot này theo lý do tự do (Quản trị, Slot Còn hàng) không;
+     * Nhân viên có được xem nội dung Slot này theo lý do tự do (Quyền Xem hàng Còn hàng, Slot Còn
+     * hàng) không;
      * để panel ẩn nút xem, không thay cho kiểm tra trong {@see reveal()}.
      */
     public function canRevealInStock(User $actor, Slot $slot): bool
     {
-        return $this->roles->allows($actor) && $slot->status === SlotStatus::InStock;
+        return $this->gate->allows($actor, Permission::RevealInStock) && $slot->status === SlotStatus::InStock;
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidReveal
      */
     private function inStockReason(RevealActor $actor, ?string $reason): string
     {
         if ($actor->user === null) {
-            throw new InvalidReveal('Chỉ Quản trị xem được nội dung hàng Còn hàng.');
+            throw new InvalidReveal('Chỉ nhân viên có Quyền xem hàng Còn hàng xem được nội dung hàng Còn hàng.');
         }
 
-        // Không truyền Vai trò nào: chỉ Quản trị qua được.
-        $this->roles->authorize($actor->user);
+        $this->gate->authorize($actor->user, Permission::RevealInStock);
 
         $reason = trim((string) $reason);
 

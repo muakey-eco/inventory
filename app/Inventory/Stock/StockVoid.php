@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Stock;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\SlotHolds;
 use App\Inventory\Warranty\DefectReportStatus;
 use App\Models\DefectReport;
@@ -15,12 +16,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * Huỷ hàng: loại Slot hoặc Đơn vị hàng khỏi vòng đời bán vì lý do không phải lỗi hàng. Không giải
  * phóng Khoá chống trùng (Tài khoản nhả khoá khi được nhập lại). Mỗi lần chuyển trạng thái ghi Sổ
- * biến động kho. Ngoài luồng Giao thay chỉ Quản trị làm được.
+ * biến động kho. Ngoài luồng Giao thay chỉ người có Quyền Huỷ hàng làm được.
  */
 class StockVoid
 {
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private StockLedger $ledger,
     ) {}
 
@@ -29,12 +30,12 @@ class StockVoid
      *
      * @param  ?string  $note  ghi chú tự do, ghi kèm vào Sổ biến động kho
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidVoid
      */
     public function voidSlot(User $actor, Slot $slot, VoidReason $reason, ?string $note = null): void
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::StockVoid);
 
         DB::transaction(fn () => $this->voidSlotWithin($actor, (int) $slot->getKey(), $reason, self::ledgerReason('Huỷ hàng', $reason, $note)));
     }
@@ -43,12 +44,12 @@ class StockVoid
      * Đơn vị hàng Hoạt động → Đã huỷ, cùng mọi Slot Còn hàng của nó. Slot Đã giao giữ nguyên: khách
      * vẫn đang dùng.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidVoid
      */
     public function voidUnit(User $actor, StockUnit $unit, VoidReason $reason, ?string $note = null): void
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::StockVoid);
 
         DB::transaction(fn () => $this->voidUnitWithin($actor, (int) $unit->getKey(), $reason, self::ledgerReason('Huỷ hàng', $reason, $note)));
     }
@@ -58,7 +59,7 @@ class StockVoid
      */
     public function canVoidSlot(User $actor, Slot $slot): bool
     {
-        return $this->roles->allows($actor) && self::isVoidable($slot) && ! self::isDefectiveStock($slot) && self::pendingDefectReportId($slot->id) === null;
+        return $this->gate->allows($actor, Permission::StockVoid) && self::isVoidable($slot) && ! self::isDefectiveStock($slot) && self::pendingDefectReportId($slot->id) === null;
     }
 
     /**
@@ -66,7 +67,7 @@ class StockVoid
      */
     public function canVoidUnit(User $actor, StockUnit $unit): bool
     {
-        return $this->roles->allows($actor)
+        return $this->gate->allows($actor, Permission::StockVoid)
             && $unit->status === StockUnitStatus::Active
             && ! SlotHolds::anyHeldForUnit((int) $unit->getKey());
     }

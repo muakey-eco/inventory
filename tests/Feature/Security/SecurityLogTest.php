@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Resources\SecurityLogEntries\SecurityLogEntryResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Security\AppendOnlyViolation;
 use App\Inventory\Security\SecurityEvent;
 use App\Inventory\Security\SecurityLog;
@@ -18,29 +17,29 @@ it('ghi đúng thời điểm tuyệt đối của sự kiện', function () {
     expect($entry->fresh()->occurred_at->utc()->format('Y-m-d H:i:s'))->toBe('2026-09-15 02:00:00');
 });
 
-it('chỉ Quản trị xem được Nhật ký bảo mật trong Filament', function (Role $role, int $status) {
+it('chỉ Quản trị xem được Nhật ký bảo mật trong Filament', function (string $role, int $status) {
     app(SecurityLog::class)->record(SecurityEvent::LoginSucceeded, email: 'la@shop.test');
 
-    $this->actingAs(staffMember($role))
+    $this->actingAs(staffInRole($role))
         ->get(SecurityLogEntryResource::getUrl('index'))
         ->assertStatus($status);
 })->with([
-    'Quản trị' => [Role::Admin, 200],
-    'Nhập kho' => [Role::Importer, 403],
-    'Bán hàng' => [Role::Sale, 403],
+    'Quản trị' => ['admin', 200],
+    'Nhập kho' => ['importer', 403],
+    'Bán hàng' => ['sale', 403],
 ]);
 
 it('Quản trị thấy các dòng nhật ký trên trang danh sách', function () {
     app(SecurityLog::class)->record(SecurityEvent::PlatformAccessRevoked, email: 'la@shop.test');
 
-    $this->actingAs(staffMember(Role::Admin))
+    $this->actingAs(staffInRole('admin'))
         ->get(SecurityLogEntryResource::getUrl('index'))
         ->assertSee('Mất quyền theo platform')
         ->assertSee('la@shop.test');
 });
 
 it('không ai tạo, sửa hay xoá được dòng Nhật ký bảo mật qua Filament, kể cả Quản trị', function () {
-    $admin = staffMember(Role::Admin);
+    $admin = staffInRole('admin');
     $entry = app(SecurityLog::class)->record(SecurityEvent::LoginSucceeded, $admin);
 
     expect($admin->can('create', SecurityLogEntry::class))->toBeFalse()

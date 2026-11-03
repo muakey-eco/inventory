@@ -20,7 +20,7 @@ use Filament\Support\Icons\Heroicon;
 
 /**
  * Trang xem Phiếu xuất: thông tin đơn, Dòng xuất, Lần giao ở dạng che (Xem mã từng lần giao), Đã
- * được xem bởi (chỉ Quản trị) và Lịch sử sửa phiếu. Sửa phiếu Hoàn tất qua modal, gọi
+ * được xem bởi (chỉ Quyền Xem nhật ký) và Lịch sử sửa phiếu. Sửa phiếu Hoàn tất qua modal, gọi
  * DispatchEditor.
  */
 class ViewDispatch extends ViewRecord

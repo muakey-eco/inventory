@@ -13,7 +13,7 @@ final readonly class StockReportFilter
 
     /**
      * @param  list<int>  $productIds  rỗng thì mọi Sản phẩm
-     * @param  ?int  $supplierId  chỉ đếm hàng của Nhà cung cấp này; chỉ Quản trị và Nhập kho
+     * @param  ?int  $supplierId  chỉ đếm hàng của Nhà cung cấp này; chỉ khi có Quyền Xem giá vốn và Nhà cung cấp
      * @param  bool  $lowStockOnly  chỉ Sản phẩm sắp hết
      * @param  int  $expiringWithinDays  N của cột Hết hạn trong N ngày
      * @param  bool  $expiringOnly  chỉ Sản phẩm có Slot hết hạn trong N ngày

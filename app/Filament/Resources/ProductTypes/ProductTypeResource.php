@@ -114,7 +114,7 @@ class ProductTypeResource extends Resource
                 // Mặc định theo Dạng hàng đã dùng được ngay; khối đang mang giá trị khác mặc định
                 // thì mở sẵn, để Sửa không giấu mất thứ mình từng đổi.
                 // Đọc bản ghi chứ không đọc state sống: ô Dạng hàng là live(), nên closure đọc
-                // state sẽ đóng sập khối ngay khi Quản trị vừa mở tay ra để sửa.
+                // state sẽ đóng sập khối ngay khi người sửa vừa mở tay ra để sửa.
                 ->collapsed(fn (?ProductType $record): bool => $record === null
                     || $record->normalization() == $record->form->defaultNormalization())
                 ->columns(2)

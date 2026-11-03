@@ -1,6 +1,5 @@
 <?php
 
-use App\Inventory\Access\Role;
 use App\Inventory\Security\SecurityEvent;
 use App\Models\SecurityLogEntry;
 use App\Models\User;
@@ -10,7 +9,7 @@ function lockedOutAdmin(string $email = 'chu@shop.test'): User
     return User::factory()->create([
         'email' => $email,
         'deactivated_at' => now(),
-        'roles' => [Role::Admin],
+        'permissions' => ['staff.manage'],
     ]);
 }
 
@@ -35,11 +34,11 @@ it('không còn tuỳ chọn reset 2FA', function () {
         ->toThrow(InvalidArgumentException::class);
 });
 
-it('từ chối khôi phục cho nhân viên không mang Vai trò Quản trị', function () {
+it('từ chối khôi phục cho nhân viên không có Quyền quản Nhân viên', function () {
     $seller = User::factory()->create([
         'email' => 'binh@shop.test',
         'deactivated_at' => now(),
-        'roles' => [Role::Sale],
+        'permissions' => ['stock.view', 'dispatch', 'defect_report'],
     ]);
 
     $this->artisan('staff:recover-admin', ['email' => 'binh@shop.test', '--unlock' => true])

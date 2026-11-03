@@ -22,7 +22,6 @@ use App\Filament\Resources\StockUnits\StockUnitResource;
 use App\Filament\Resources\SupplierClaims\SupplierClaimResource;
 use App\Filament\Resources\Suppliers\SupplierResource;
 use App\Filament\Support\NavGroup;
-use App\Inventory\Access\Role;
 use Filament\Facades\Filament;
 
 dataset('mục điều hướng', [
@@ -113,7 +112,7 @@ it('đặt nhãn tiếng Việt cho Tổng quan', function () {
  * đúng chuyện thứ tự mục chưa được khai bao giờ.
  */
 it('xếp thứ tự mục trong từng nhóm, Quản trị thấy đủ 21 mục', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
 
     $menu = collect(Filament::getNavigation())
         ->filter(fn ($group) => filled($group->getLabel()))

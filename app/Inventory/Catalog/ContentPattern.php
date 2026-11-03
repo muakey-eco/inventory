@@ -3,7 +3,7 @@
 namespace App\Inventory\Catalog;
 
 /**
- * Regex tuỳ chọn của Trường nội dung. Quản trị chỉ viết phần thân (không delimiter);
+ * Regex tuỳ chọn của Trường nội dung. Người khai báo chỉ viết phần thân (không delimiter);
  * giá trị phải khớp toàn bộ, không chỉ chứa một đoạn khớp.
  */
 final class ContentPattern

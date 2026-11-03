@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Resources\Batches\Pages\ViewBatch;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Catalog\SupplierDirectory;
@@ -31,7 +30,7 @@ beforeEach(function () {
     Repeater::fake();
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->product = productOf(
         StockForm::OneTimeCode,

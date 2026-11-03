@@ -4,7 +4,6 @@ use App\Filament\Resources\ProductTypes\Pages\CreateProductType;
 use App\Filament\Resources\ProductTypes\Pages\EditProductType;
 use App\Filament\Resources\ProductTypes\Pages\ListProductTypes;
 use App\Filament\Resources\ProductTypes\ProductTypeResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Models\ProductType;
@@ -54,8 +53,8 @@ function cardTypeForm(?array $fields = null, mixed ...$overrides): array
     ];
 }
 
-it('mọi Vai trò xem được danh sách Loại sản phẩm, chỉ Quản trị vào được trang Tạo', function (Role $role, bool $canCreate) {
-    $this->actingAs(staffMember($role))
+it('mọi Vai trò xem được danh sách Loại sản phẩm, chỉ Quản trị vào được trang Tạo', function (string $role, bool $canCreate) {
+    $this->actingAs(staffInRole($role))
         ->get(ProductTypeResource::getUrl('index'))
         ->assertOk();
 
@@ -64,13 +63,13 @@ it('mọi Vai trò xem được danh sách Loại sản phẩm, chỉ Quản tr�
     Livewire::test(ListProductTypes::class)
         ->{$canCreate ? 'assertActionVisible' : 'assertActionHidden'}(CreateAction::class);
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, false],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', false],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('Quản trị khai một Loại sản phẩm kèm Trường nội dung, xong về danh sách', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
 
     Livewire::test(CreateProductType::class)
         ->fillForm(cardTypeForm())
@@ -88,7 +87,7 @@ it('Quản trị khai một Loại sản phẩm kèm Trường nội dung, xong 
 });
 
 it('lỗi khai báo ở trang Tạo thành thông báo, không ghi gì và ở lại form', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     cardProductType();
 
     Livewire::test(CreateProductType::class)
@@ -101,7 +100,7 @@ it('lỗi khai báo ở trang Tạo thành thông báo, không ghi gì và ở l
 });
 
 it('trang Sửa xem trước thay đổi và nêu Sản phẩm chịu ảnh hưởng trước khi ghi', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $type = cardProductType();
     productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
 
@@ -126,7 +125,7 @@ it('trang Sửa xem trước thay đổi và nêu Sản phẩm chịu ảnh hư�
 });
 
 it('xác nhận rồi thì thay đổi áp cho mọi Sản phẩm của Loại', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $type = cardProductType();
     $garena = productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
     $zing = productIn($type, 'Thẻ Zing 20k', 'ZING-20K');
@@ -151,7 +150,7 @@ it('xác nhận rồi thì thay đổi áp cho mọi Sản phẩm của Loại',
 });
 
 it('Loại đã có Sản phẩm có hàng: hộp cảnh báo nêu đích danh Sản phẩm chặn, và bản sửa bị từ chối trọn gói', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $type = cardProductType();
     withStock(productIn($type, 'Thẻ Garena 100k', 'GARENA-100K'));
 
@@ -182,7 +181,7 @@ it('Loại đã có Sản phẩm có hàng: hộp cảnh báo nêu đích danh S
 });
 
 it('trang Sửa của Loại chưa có hàng không hiện hộp cảnh báo', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $type = cardProductType();
     productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
 
@@ -191,7 +190,7 @@ it('trang Sửa của Loại chưa có hàng không hiện hộp cảnh báo', f
 });
 
 it('Quản trị Ngừng dùng Loại; Loại đang có Sản phẩm không có nút xoá', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $type = cardProductType();
     productIn($type, 'Thẻ Garena 100k', 'GARENA-100K');
 
@@ -204,7 +203,7 @@ it('Quản trị Ngừng dùng Loại; Loại đang có Sản phẩm không có 
 });
 
 it('Quản trị xoá được Loại chưa Sản phẩm nào dùng, xoá xong về danh sách', function () {
-    $this->actingAs(staffMember(Role::Admin));
+    $this->actingAs(staffInRole('admin'));
     $type = cardProductType();
 
     Livewire::test(EditProductType::class, ['record' => $type->getRouteKey()])
@@ -215,9 +214,9 @@ it('Quản trị xoá được Loại chưa Sản phẩm nào dùng, xoá xong v
     expect(ProductType::count())->toBe(0);
 });
 
-it('Nhập kho và Bán hàng không sửa, không Ngừng dùng, không xoá được Loại sản phẩm', function (Role $role) {
+it('Nhập kho và Bán hàng không sửa, không Ngừng dùng, không xoá được Loại sản phẩm', function (string $role) {
     $type = cardProductType();
-    $this->actingAs(staffMember($role));
+    $this->actingAs(staffInRole($role));
 
     $this->get(ProductTypeResource::getUrl('edit', ['record' => $type]))->assertForbidden();
 
@@ -226,6 +225,6 @@ it('Nhập kho và Bán hàng không sửa, không Ngừng dùng, không xoá đ
         ->assertActionHidden(TestAction::make('discontinue')->table($type))
         ->assertActionHidden(TestAction::make('delete')->table($type));
 })->with([
-    'Nhập kho' => Role::Importer,
-    'Bán hàng' => Role::Sale,
+    'Nhập kho' => 'importer',
+    'Bán hàng' => 'sale',
 ]);

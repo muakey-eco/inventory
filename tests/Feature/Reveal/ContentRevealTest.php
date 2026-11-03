@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -30,7 +29,7 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
 
     $this->reveal = app(ContentReveal::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
 
     $product = productOf(
         StockForm::OneTimeCode,
@@ -82,7 +81,7 @@ it('mỗi lần xem ghi thêm một dòng Nhật ký xem mã', function () {
     expect(RevealLogEntry::orderBy('id')->pluck('reason')->all())->toBe(['Lần 1', 'Lần 2']);
 });
 
-it('Quản trị xem hàng Còn hàng bắt buộc nhập lý do', function (?string $reason) {
+it('Xem hàng Còn hàng bắt buộc nhập lý do', function (?string $reason) {
     expect(fn () => $this->reveal->reveal(RevealActor::staff($this->admin), $this->slot, RevealContext::inStock(), $reason))
         ->toThrow(InvalidReveal::class, 'Xem nội dung hàng Còn hàng phải nhập lý do.')
         ->and(RevealLogEntry::count())->toBe(0);
@@ -91,26 +90,26 @@ it('Quản trị xem hàng Còn hàng bắt buộc nhập lý do', function (?st
     'để trống' => ['   '],
 ]);
 
-it('vai trò khác Quản trị không xem được hàng Còn hàng và không để lại nội dung', function (Role $role) {
-    expect(fn () => $this->reveal->reveal(RevealActor::staff(staffMember($role)), $this->slot, RevealContext::inStock(), 'Tò mò'))
-        ->toThrow(MissingRole::class)
+it('vai trò khác Quản trị không xem được hàng Còn hàng và không để lại nội dung', function (string $role) {
+    expect(fn () => $this->reveal->reveal(RevealActor::staff(staffInRole($role)), $this->slot, RevealContext::inStock(), 'Tò mò'))
+        ->toThrow(MissingPermission::class)
         ->and(RevealLogEntry::count())->toBe(0);
 })->with([
-    'Nhập kho' => [Role::Importer],
-    'Bán hàng' => [Role::Sale],
+    'Nhập kho' => ['importer'],
+    'Bán hàng' => ['sale'],
 ]);
 
 it('Quản trị đã bị Khoá nhân viên không xem được', function () {
     $this->admin->forceFill(['deactivated_at' => now()])->save();
 
     expect(fn () => $this->reveal->reveal(RevealActor::staff($this->admin), $this->slot, RevealContext::inStock(), 'Kiểm tra'))
-        ->toThrow(MissingRole::class)
+        ->toThrow(MissingPermission::class)
         ->and(RevealLogEntry::count())->toBe(0);
 });
 
 it('Khoá API không xem được hàng Còn hàng', function () {
     expect(fn () => $this->reveal->reveal(RevealActor::apiKey(7), $this->slot, RevealContext::inStock(), 'Website'))
-        ->toThrow(InvalidReveal::class, 'Chỉ Quản trị xem được nội dung hàng Còn hàng.')
+        ->toThrow(InvalidReveal::class, 'Chỉ nhân viên có Quyền xem hàng Còn hàng xem được nội dung hàng Còn hàng.')
         ->and(RevealLogEntry::count())->toBe(0);
 });
 

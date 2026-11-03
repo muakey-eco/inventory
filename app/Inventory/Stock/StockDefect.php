@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Stock;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Claims\SupplierClaims;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Inventory\Dispatch\SlotHolds;
@@ -14,15 +15,15 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Đơn vị hàng chuyển Lỗi và Khôi phục. Đánh dấu Lỗi: Quản trị chuyển Lỗi không cần Báo lỗi (nhà
- * cung cấp thu hồi, hỏng trong kho). Khôi phục: Quản trị đưa Đơn vị hàng Lỗi về Hoạt động khi nhà
- * cung cấp sửa được; Báo lỗi và Đổi hàng đã làm giữ nguyên. Lúc chuyển Lỗi, Slot Còn hàng được ghi
+ * Đơn vị hàng chuyển Lỗi và Khôi phục. Cần Quyền Đánh dấu Lỗi và Khôi phục. Đánh dấu
+ * Lỗi: chuyển Lỗi không cần Báo lỗi (nhà cung cấp thu hồi, hỏng trong kho). Khôi phục: đưa Đơn vị
+ * hàng Lỗi về Hoạt động khi nhà cung cấp sửa được; Báo lỗi và Đổi hàng đã làm giữ nguyên. Lúc chuyển Lỗi, Slot Còn hàng được ghi
  * mốc Tổn thất hàng Lỗi (`slots.defective_loss_at`); Khôi phục bỏ mốc đó.
  */
 class StockDefect
 {
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private StockLedger $ledger,
         private SupplierClaims $claims,
     ) {}
@@ -33,12 +34,12 @@ class StockDefect
      *
      * @return list<AffectedDelivery>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectMarking
      */
     public function markDefective(User $actor, StockUnit $unit, string $reason): array
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::StockDefect);
         $reason = self::requiredReason($reason, 'Đánh dấu Lỗi phải nhập lý do.');
 
         return DB::transaction(function () use ($actor, $unit, $reason): array {
@@ -58,12 +59,12 @@ class StockDefect
      * Đơn vị hàng Lỗi → Hoạt động, kèm lý do bắt buộc. Slot Còn hàng bán lại được và không còn tính
      * Tổn thất hàng Lỗi.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidDefectMarking
      */
     public function restore(User $actor, StockUnit $unit, string $reason): void
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::StockDefect);
         $reason = self::requiredReason($reason, 'Khôi phục phải nhập lý do.');
 
         DB::transaction(function () use ($actor, $unit, $reason): void {
@@ -88,7 +89,7 @@ class StockDefect
      */
     public function canMarkDefective(User $actor, StockUnit $unit): bool
     {
-        return $this->roles->allows($actor)
+        return $this->gate->allows($actor, Permission::StockDefect)
             && $unit->status === StockUnitStatus::Active
             && ! SlotHolds::anyHeldForUnit((int) $unit->getKey());
     }
@@ -98,7 +99,7 @@ class StockDefect
      */
     public function canRestore(User $actor, StockUnit $unit): bool
     {
-        return $this->roles->allows($actor) && $unit->status === StockUnitStatus::Defective;
+        return $this->gate->allows($actor, Permission::StockDefect) && $unit->status === StockUnitStatus::Defective;
     }
 
     /**

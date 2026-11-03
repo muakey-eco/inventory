@@ -4,11 +4,11 @@ namespace App\Filament\Resources\Staff;
 
 use App\Filament\Resources\Staff\Pages\ManageStaff;
 use App\Filament\Support\NavGroup;
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Staff\LastActiveAdmin;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGroup;
+use App\Inventory\Staff\LastActiveStaffManager;
 use App\Inventory\Staff\StaffManager;
-use App\Inventory\Staff\StaffMirror;
 use App\Models\User;
 use BackedEnum;
 use Closure;
@@ -22,10 +22,11 @@ use Filament\Tables\Table;
 use UnitEnum;
 
 /**
- * Danh sách nhân viên trong panel. Nhân viên, tên, email, Vai trò và việc còn quyền vào kho
- * đều đến từ platform (ADR 0011), nên ở đây chỉ đọc; thao tác duy nhất là Khoá nhân viên và
- * mở khoá. Adapter mỏng: mọi thao tác gọi StaffManager, nơi kiểm tra Vai trò, chặn khoá Quản
- * trị đang hoạt động cuối cùng và ghi Nhật ký bảo mật. Không có thao tác xoá nhân viên.
+ * Danh sách nhân viên trong panel. Nhân viên, tên, email, Quyền và việc còn quyền vào kho
+ * đều đến từ platform (ADR 0011, ADR 0012), nên ở đây chỉ đọc; thao tác duy nhất là Khoá nhân
+ * viên và mở khoá. Adapter mỏng: mọi thao tác gọi StaffManager, nơi kiểm tra Quyền, chặn khoá
+ * người cuối cùng đang hoạt động có Quyền quản Nhân viên và ghi Nhật ký bảo mật. Không có thao
+ * tác xoá nhân viên.
  */
 class StaffResource extends Resource
 {
@@ -60,22 +61,22 @@ class StaffResource extends Resource
                     ->label('Email')
                     ->searchable(),
                 // Bản chụp theo lần cuối kho thấy nhân viên (ADR 0011): danh bạ của platform không
-                // mang Permission, nên Vai trò đổi trên platform chỉ hiện ở đây khi họ vào kho lại.
-                TextColumn::make('roles')
-                    ->label('Vai trò')
+                // mang Permission, nên Quyền đổi trên platform chỉ hiện ở đây khi họ vào kho lại.
+                TextColumn::make('permissions')
+                    ->label('Quyền')
                     ->tooltip('Theo lần cuối kho thấy nhân viên này')
-                    ->badge()
-                    // Xếp theo thứ tự khai báo Vai trò cho dễ dò, không theo thứ tự platform trả.
-                    ->state(fn (User $record): array => StaffMirror::roleNames($record->roles))
-                    ->formatStateUsing(fn (string $state): string => Role::from($state)->label()),
+                    ->listWithLineBreaks()
+                    ->placeholder('Không có Quyền nào')
+                    ->state(fn (User $record): array => self::permissionsByGroup($record)),
                 TextColumn::make('deactivated_at')
                     ->label('Khoá nhân viên')
                     ->badge()
                     ->state(fn (User $record): string => $record->isDeactivated() ? 'Đã khoá' : 'Hoạt động')
                     ->color(fn (User $record): string => $record->isDeactivated() ? 'danger' : 'success'),
                 // Tách cột với Khoá nhân viên: mất quyền theo platform tự hết khi platform cấp
-                // lại, còn Khoá nhân viên thì chỉ Quản trị mở được. Chỉ thấy được khi nhân viên
-                // bị đình chỉ hay bị xoá; mất mỗi quyền vào kho thì danh bạ không báo.
+                // lại, còn Khoá nhân viên thì chỉ người có Quyền quản Nhân viên mở được. Chỉ thấy
+                // được khi nhân viên bị đình chỉ hay bị xoá; mất mỗi quyền vào kho thì danh bạ không
+                // báo.
                 TextColumn::make('platform_revoked_at')
                     ->label('Platform')
                     ->badge()
@@ -130,14 +131,39 @@ class StaffResource extends Resource
     }
 
     /**
-     * Chạy thao tác của module Kho, đổi lỗi nghiệp vụ thành thông báo cho Quản trị.
+     * Quyền trong bản chụp, mỗi nhóm một dòng "Nhóm: Quyền, Quyền", theo thứ tự khai báo cho dễ
+     * dò, không theo thứ tự platform trả.
+     *
+     * @return list<string>
+     */
+    private static function permissionsByGroup(User $staff): array
+    {
+        $held = Permission::inOrder($staff->permissions);
+        $lines = [];
+
+        foreach (PermissionGroup::cases() as $group) {
+            $labels = array_map(
+                fn (Permission $permission): string => $permission->label(),
+                array_filter($held, fn (Permission $permission): bool => $permission->group() === $group),
+            );
+
+            if ($labels !== []) {
+                $lines[] = $group->label().': '.implode(', ', $labels);
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Chạy thao tác của module Kho, đổi lỗi nghiệp vụ thành thông báo cho người thao tác.
      */
     private static function attempt(Closure $operation, string $success): Closure
     {
         return function (Action $action) use ($operation, $success): void {
             try {
                 $action->evaluate($operation);
-            } catch (LastActiveAdmin|MissingRole $exception) {
+            } catch (LastActiveStaffManager|MissingPermission $exception) {
                 Notification::make()->danger()->title($exception->getMessage())->send();
 
                 return;

@@ -1,6 +1,6 @@
 <?php
 
-use App\Inventory\Access\Role;
+use App\Inventory\Access\Permission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ProductCatalog;
 use App\Inventory\Catalog\ProductDraft;
@@ -20,6 +20,7 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use League\Flysystem\Filesystem;
+use Symfony\Component\Yaml\Yaml;
 use Tests\Support\ObjectStorageFake;
 use Tests\TestCase;
 
@@ -32,12 +33,36 @@ pest()->extend(TestCase::class)
     ->in('Concurrency');
 
 /**
- * Nhân viên mà kho đã thấy mang các Vai trò cho trước (bản chụp Vai trò). Qua `actingAs` thì
+ * Nhân viên mà kho đã thấy mang đúng các Quyền cho trước (bản chụp Quyền). Qua `actingAs` thì
  * platform giả trả đúng các Permission đó.
  */
-function staffMember(Role ...$roles): User
+function staffMember(Permission ...$permissions): User
 {
-    return User::factory()->create(['roles' => $roles]);
+    return User::factory()->create(['permissions' => $permissions]);
+}
+
+/**
+ * Nhân viên được cấp các role cho trước trong `platform.yaml` (`admin`, `importer`, `sale`): mang
+ * mọi Quyền mà các role đó gom, như platform cấp thật.
+ */
+function staffInRole(string ...$roles): User
+{
+    $declared = platformManifest()['roles'];
+
+    return staffMember(...Permission::fromPlatform(array_merge(...array_map(
+        fn (string $role): array => $declared[$role]['permissions'],
+        $roles,
+    ))));
+}
+
+/**
+ * Manifest platform của kho, đọc từ `platform.yaml`.
+ *
+ * @return array{permissions: array<string, array{description: string}>, roles: array<string, array{permissions: list<string>}>}
+ */
+function platformManifest(): array
+{
+    return Yaml::parseFile(base_path('platform.yaml'));
 }
 
 /**
@@ -50,7 +75,7 @@ function productTypeOf(StockForm $form, array $fields, mixed ...$overrides): Pro
 {
     static $sequence = 0;
 
-    return app(ProductTypeCatalog::class)->create(staffMember(Role::Admin), new ProductTypeDraft(...[
+    return app(ProductTypeCatalog::class)->create(staffInRole('admin'), new ProductTypeDraft(...[
         'name' => 'Loại '.++$sequence,
         'form' => $form,
         'fields' => $fields,
@@ -74,7 +99,7 @@ function productOf(StockForm $form, array $fields, string $name, string $code, m
  */
 function productIn(ProductType $type, string $name, string $code, mixed ...$overrides): Product
 {
-    return app(ProductCatalog::class)->create(staffMember(Role::Admin), new ProductDraft(...[
+    return app(ProductCatalog::class)->create(staffInRole('admin'), new ProductDraft(...[
         'productType' => $type,
         'name' => $name,
         'code' => $code,

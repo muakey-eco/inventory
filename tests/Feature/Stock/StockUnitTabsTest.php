@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Resources\StockUnits\Pages\ListStockUnits;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -27,8 +26,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->netflix = productOf(
         StockForm::Account,

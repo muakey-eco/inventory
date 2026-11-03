@@ -21,7 +21,7 @@ use UnitEnum;
 
 /**
  * Nhà cung cấp trong panel. Adapter mỏng: mọi thao tác gọi SupplierDirectory.
- * Bán hàng không thấy trang này (SupplierPolicy).
+ * Cần Quyền Quản lý Nhà cung cấp (SupplierPolicy).
  */
 class SupplierResource extends Resource
 {

@@ -18,10 +18,10 @@ return new class extends Migration
             // Slot bị xem; null khi nội dung không thuộc Slot nào (dòng bị bỏ khi nhập).
             $table->foreignId('slot_id')->nullable()->constrained()->restrictOnDelete();
             $table->foreignId('stock_unit_id')->nullable()->constrained()->restrictOnDelete();
-            // Ngữ cảnh xem mã và bản ghi của nó (null khi Quản trị xem hàng Còn hàng).
+            // Ngữ cảnh xem mã và bản ghi của nó (null khi xem hàng Còn hàng).
             $table->string('context');
             $table->unsignedBigInteger('context_id')->nullable();
-            // Lý do suy ra từ ngữ cảnh hoặc lý do tự do của Quản trị. Không bao giờ chứa nội dung mã.
+            // Lý do suy ra từ ngữ cảnh hoặc lý do tự do khi xem hàng Còn hàng. Không bao giờ chứa nội dung mã.
             $table->text('reason');
             $table->timestampTz('occurred_at')->useCurrent()->index();
 

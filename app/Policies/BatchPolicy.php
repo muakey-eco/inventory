@@ -2,37 +2,37 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\Batch;
 use App\Models\User;
 
 /**
- * Lô nhập: Quản trị và Nhập kho tạo, xem trước, sửa khi còn Chờ xác nhận và xác nhận; Bán hàng
- * không thấy. Quy tắc thật nằm trong BatchIntake. Lô nhập đã xác nhận thì không sửa, không xoá.
+ * Lô nhập: người có Quyền Nhập hàng tạo, xem trước, sửa khi còn Chờ xác nhận và xác nhận. Quy
+ * tắc thật nằm trong BatchIntake. Lô nhập đã xác nhận thì không sửa, không xoá.
  */
 class BatchPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::Intake);
     }
 
     public function view(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::Intake);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::Intake);
     }
 
     public function confirm(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::Intake);
     }
 
     /**
@@ -42,7 +42,7 @@ class BatchPolicy
      */
     public function revise(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::Intake);
     }
 
     /**
@@ -51,15 +51,15 @@ class BatchPolicy
      */
     public function recordInvoiceTotal(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::Intake);
     }
 
     /**
-     * Huỷ nhập: chỉ Quản trị.
+     * Huỷ nhập: Quyền riêng, không đi kèm Quyền Nhập hàng.
      */
     public function reverse(User $user, Batch $batch): bool
     {
-        return $this->roles->allows($user);
+        return $this->gate->allows($user, Permission::IntakeReverse);
     }
 
     public function update(User $user, Batch $batch): bool

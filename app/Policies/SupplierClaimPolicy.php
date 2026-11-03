@@ -2,32 +2,32 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\SupplierClaim;
 use App\Models\User;
 
 /**
- * Khiếu nại nhà cung cấp: Quản trị và Nhập kho tạo, gửi, giải quyết và huỷ; Bán hàng không thấy.
+ * Khiếu nại nhà cung cấp: người có Quyền Khiếu nại nhà cung cấp tạo, gửi, giải quyết và huỷ.
  * Quy tắc thật nằm trong SupplierClaims. Khiếu nại không sửa trực tiếp, không xoá.
  */
 class SupplierClaimPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierClaim);
     }
 
     public function view(User $user, SupplierClaim $supplierClaim): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierClaim);
     }
 
     public function create(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer);
+        return $this->gate->allows($user, Permission::SupplierClaim);
     }
 
     public function update(User $user, SupplierClaim $supplierClaim): bool

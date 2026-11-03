@@ -2,31 +2,90 @@
 # `platform-cli sync` ở máy deploy, trước khi rollout image mới (README, mục "Đăng nhập qua
 # platform").
 #
-# Mỗi Vai trò của kho là đúng một Permission cùng tên (`App\Inventory\Access\Role`), và role cùng
-# tên trên platform cấp Permission đó cùng Permission vào cửa `access`. Platform chỉ trả Permission
-# cho App, không trả role: đổi tên một permission ở đây là cả kho mất Vai trò đó.
+# Mỗi Quyền của kho là đúng một Permission cùng tên (`App\Inventory\Access\Permission`, ADR 0012).
+# Kho không có Vai trò: role ở đây chỉ gom Quyền cho tiện cấp, kho không biết tới role. Platform chỉ
+# trả Permission cho App: đổi tên một permission ở đây là mọi người mất Quyền đó tới khi sync lại.
+# Thêm Permission mới thì thêm cả vào role `admin`, không thì chủ shop mất việc đó.
 version: 1
 home_url: https://kho.muakeyoffice.net
 permissions:
   # Permission vào cửa (ADR-0007 của platform): thiếu thì không vào được `/admin`.
   access:
     description: Vào kho hàng số
-  admin:
-    description: Quản trị, chủ shop, làm được mọi việc trong kho
-  importer:
-    description: Nhập kho, nhập hàng và làm việc với Nhà cung cấp
-  sale:
-    description: Bán hàng, xuất kho và xử lý sau giao
+  stock.view:
+    description: Xem Sản phẩm, Loại sản phẩm, Đơn vị hàng, báo cáo tồn và biến động (không có giá vốn)
+  cost.view:
+    description: Xem giá vốn và Nhà cung cấp trong báo cáo tồn và biến động, xem Tỉ lệ lỗi
+  intake:
+    description: "Nhập hàng: tạo, kiểm tra, sửa và xác nhận Lô nhập, ghi tổng tiền hoá đơn, xem mã qua Lô nhập"
+  intake.reverse:
+    description: Huỷ nhập
+  supplier.manage:
+    description: Quản lý Nhà cung cấp
+  supplier_claim:
+    description: Khiếu nại nhà cung cấp
+  dispatch:
+    description: "Xuất hàng: Phiếu xuất, Giao hàng, Giao thêm, Giao thay, sửa phiếu, tra cứu giao hàng, xem mã qua Giao hàng"
+  defect_report:
+    description: Báo lỗi và Đổi hàng
+  replacement.approve:
+    description: Duyệt Đổi hàng từ lần thứ 3; có quyền này thì đổi thẳng, không phải xin duyệt
+  deadline.override:
+    description: "Vượt hạn: Báo lỗi, Đổi hàng hoặc xem mã ngoài Hạn bảo hành, Giao thay quá hạn"
+  stock.void:
+    description: Huỷ hàng
+  stock.defect:
+    description: Đánh dấu Lỗi và Khôi phục Đơn vị hàng
+  content.exposure:
+    description: Ghi nhận lộ nội dung
+  reveal.in_stock:
+    description: Xem nội dung hàng Còn hàng kèm lý do tự do
+  catalog.manage:
+    description: "Quản lý Sản phẩm và Loại sản phẩm: tạo, sửa, ngừng bán, xoá"
+  report.profit:
+    description: Xem Lãi gộp, Lãi ròng kho, lãi theo phiếu, lỗ theo Nhà cung cấp
+  staff.manage:
+    description: "Quản lý Nhân viên: Khoá nhân viên và mở khoá"
+  sales_channel.manage:
+    description: Quản lý Kênh bán
+  api_key.manage:
+    description: Quản lý Khoá API
+  dispatch_freeze:
+    description: Tạm dừng xuất kho và Ghi nhận giao bù
+  log.view:
+    description: Xem Nhật ký xem mã và Nhật ký bảo mật
 roles:
   admin:
     description: Quản trị
-    permissions: [access, admin]
+    permissions:
+      - access
+      - stock.view
+      - cost.view
+      - intake
+      - intake.reverse
+      - supplier.manage
+      - supplier_claim
+      - dispatch
+      - defect_report
+      - replacement.approve
+      - deadline.override
+      - stock.void
+      - stock.defect
+      - content.exposure
+      - reveal.in_stock
+      - catalog.manage
+      - report.profit
+      - staff.manage
+      - sales_channel.manage
+      - api_key.manage
+      - dispatch_freeze
+      - log.view
   importer:
     description: Nhập kho
-    permissions: [access, importer]
+    permissions: [access, stock.view, cost.view, intake, supplier.manage, supplier_claim]
   sale:
     description: Bán hàng
-    permissions: [access, sale]
+    permissions: [access, stock.view, dispatch, defect_report]
 # Bản sao danh bạ: platform chỉ gửi webhook tới Service trong cụm.
 webhook:
   url: http://web.inventory.svc:8000/admin/auth/webhook

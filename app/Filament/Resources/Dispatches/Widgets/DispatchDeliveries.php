@@ -4,8 +4,8 @@ namespace App\Filament\Resources\Dispatches\Widgets;
 
 use App\Filament\Resources\DefectReports\DefectReportResource;
 use App\Filament\Support\InventoryAction;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Dispatch\AffectedDelivery;
 use App\Inventory\Dispatch\CorrectionDraft;
 use App\Inventory\Dispatch\CorrectionPreview;
@@ -45,7 +45,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Bảng Lần giao trên trang xem Phiếu xuất, nội dung luôn dạng che. Xem mã gọi ContentReveal
- * (Bán hàng trong Hạn bảo hành, quá hạn chỉ Quản trị), mỗi lần ghi Nhật ký xem mã. Giao thay qua
+ * (trong Hạn bảo hành; quá hạn cần Quyền Vượt hạn), mỗi lần ghi Nhật ký xem mã. Giao thay qua
  * modal gọi CorrectiveDelivery, rồi hiện mã lần giao mới như Xem mã. Báo lỗi một hoặc nhiều lần
  * giao (chọn nhiều dòng) gọi DefectReporting. Nội dung chỉ nằm trong tham
  * số của modal vừa mở: không lưu ở server, nhưng đi trong snapshot Livewire (không mã hoá) tới
@@ -125,7 +125,7 @@ class DispatchDeliveries extends TableWidget
                     ->modalDescription('Mỗi Slot một Báo lỗi Chờ xác minh; trong lúc chờ, Slot còn trong kho của cùng Đơn vị hàng tạm ngừng bán.')
                     ->modalSubmitActionLabel('Tạo Báo lỗi')
                     ->schema(fn (Collection $records): array => self::reportSchema(self::selectedDeliveries($records)))
-                    ->visible(fn (RoleGate $roles): bool => $roles->allows(InventoryAction::actor(), Role::Sale))
+                    ->visible(fn (PermissionGate $gate): bool => $gate->allows(InventoryAction::actor(), Permission::DefectReport))
                     ->deselectRecordsAfterCompletion()
                     ->action(fn (BulkAction $action, Collection $records, array $data, DefectReporting $reports) => self::report($action, $reports, self::selectedDeliveries($records), $data)),
             ])
@@ -228,7 +228,7 @@ class DispatchDeliveries extends TableWidget
                 e($preview->unitLabel),
                 $preview->deliveredAt->format('d/m/Y H:i'),
                 e($preview->remainingLabel()),
-                $preview->late ? ' Quá hạn: chỉ Quản trị Giao thay, bắt buộc nhập lý do.' : '',
+                $preview->late ? ' Quá hạn: chỉ người có Quyền Vượt hạn Giao thay, bắt buộc nhập lý do.' : '',
             ))),
             Select::make('product_id')
                 ->label('Sản phẩm giao thay')
@@ -262,8 +262,8 @@ class DispatchDeliveries extends TableWidget
     }
 
     /**
-     * Form Báo lỗi: các lần Bác bỏ trước của Slot, mô tả bắt buộc, ảnh tuỳ chọn và lý do khi Quản trị
-     * Báo lỗi ngoài Hạn bảo hành.
+     * Form Báo lỗi: các lần Bác bỏ trước của Slot, mô tả bắt buộc, ảnh tuỳ chọn và lý do khi người có
+     * Quyền Vượt hạn Báo lỗi ngoài Hạn bảo hành.
      *
      * @param  list<Delivery>  $deliveries
      * @return list<mixed>
@@ -293,10 +293,9 @@ class DispatchDeliveries extends TableWidget
                 ->storeFiles(false),
             Textarea::make('override_reason')
                 ->label('Lý do vượt Hạn bảo hành')
-                ->helperText('Có lần giao ngoài Hạn bảo hành hoặc Sản phẩm không có bảo hành; chỉ Quản trị Báo lỗi được, bắt buộc lý do.')
+                ->helperText('Có lần giao ngoài Hạn bảo hành hoặc Sản phẩm không có bảo hành; chỉ người có Quyền Vượt hạn Báo lỗi được, bắt buộc lý do.')
                 ->rows(2)
-                // Không truyền Vai trò nào: chỉ Quản trị vượt Hạn bảo hành.
-                ->visible(app(RoleGate::class)->allows($actor) && collect($deliveries)->contains(fn (Delivery $delivery): bool => DefectReporting::isOutOfWarranty($delivery))),
+                ->visible(app(PermissionGate::class)->allows($actor, Permission::DeadlineOverride) && collect($deliveries)->contains(fn (Delivery $delivery): bool => DefectReporting::isOutOfWarranty($delivery))),
         ];
     }
 

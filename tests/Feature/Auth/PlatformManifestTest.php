@@ -1,23 +1,41 @@
 <?php
 
-use App\Inventory\Access\Role;
+use App\Inventory\Access\Permission;
 
 /*
- * `platform.yaml` là Manifest platform của kho (ADR 0011). Guard của SDK đòi Permission vào cửa
- * `platform.entry_permission`, và RoleGate đọc Vai trò theo tên Permission: Manifest lệch enum
- * `Role` là cả kho mất Vai trò đó.
+ * `platform.yaml` là Manifest platform của kho (ADR 0011, ADR 0012). Guard của SDK đòi Permission
+ * vào cửa `platform.entry_permission`, và PermissionGate đọc Quyền theo tên Permission: Quyền code
+ * kiểm mà manifest không khai thì không ai có, Permission thiếu trong role `admin` thì chủ shop mất
+ * việc đó.
  */
 
-it('khai Permission vào cửa và đúng một Permission cho mỗi Vai trò, mỗi role cấp kèm access', function () {
-    $yaml = (string) file_get_contents(base_path('platform.yaml'));
-    $entry = (string) config('platform.entry_permission');
+it('khai Permission vào cửa và mọi Quyền code kiểm, kèm mô tả', function () {
+    $declared = platformManifest()['permissions'];
 
-    expect($entry)->toBe('access')
-        ->and($yaml)->toMatch('/^permissions:\n(?:  .*\n)*?  '.$entry.':/m');
+    expect(config('platform.entry_permission'))->toBe('access')
+        ->and($declared)->toHaveKey('access');
 
-    foreach (Role::cases() as $role) {
-        expect($yaml)
-            ->toMatch('/^permissions:\n(?:  .*\n)*?  '.$role->value.':/m')
-            ->toMatch('/^roles:\n(?:  .*\n)*?  '.$role->value.":\n(?:    .*\n)*?    permissions: \\[{$entry}, {$role->value}\\]/m");
+    foreach (Permission::cases() as $permission) {
+        expect($declared)->toHaveKey($permission->value)
+            ->and($declared[$permission->value]['description'])->not->toBeEmpty();
     }
+});
+
+it('role admin cấp mọi Permission khai trong manifest', function () {
+    $manifest = platformManifest();
+
+    expect($manifest['roles']['admin']['permissions'])->toEqualCanonicalizing(array_keys($manifest['permissions']));
+});
+
+it('role importer và sale cấp đúng phạm vi của Vai trò Nhập kho và Bán hàng cũ', function () {
+    $roles = platformManifest()['roles'];
+
+    expect($roles['importer']['permissions'])->toEqualCanonicalizing(['access', 'stock.view', 'cost.view', 'intake', 'supplier.manage', 'supplier_claim'])
+        ->and($roles['sale']['permissions'])->toEqualCanonicalizing(['access', 'stock.view', 'dispatch', 'defect_report']);
+});
+
+it('manifest không khai Permission nào mà kho không kiểm', function () {
+    $known = ['access', ...array_map(fn (Permission $permission): string => $permission->value, Permission::cases())];
+
+    expect(array_keys(platformManifest()['permissions']))->toEqualCanonicalizing($known);
 });

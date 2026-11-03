@@ -2,7 +2,7 @@
 
 namespace App\Filament\Support;
 
-use App\Inventory\Access\MissingRole;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Api\InvalidApiKey;
 use App\Inventory\Catalog\InvalidProductConfiguration;
 use App\Inventory\Catalog\InvalidSupplier;
@@ -72,7 +72,7 @@ final class InventoryAction
     {
         return $exception instanceof InvalidProductConfiguration
             || $exception instanceof InvalidSupplier
-            || $exception instanceof MissingRole
+            || $exception instanceof MissingPermission
             || $exception instanceof ProductHasStock
             || $exception instanceof InvalidBatch
             || $exception instanceof InvalidReveal

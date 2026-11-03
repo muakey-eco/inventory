@@ -15,7 +15,7 @@ final readonly class DeliveredContent
     /**
      * @param  array<string, string>  $fields  theo tên hiển thị Trường nội dung, đúng thứ tự trường
      * @param  array<string, string>  $values  cùng nội dung nhưng theo định danh Trường nội dung: khoá
-     *                                         ổn định cho API, không đổi khi Quản trị sửa tên hiển thị
+     *                                         ổn định cho API, không đổi khi sửa tên hiển thị
      * @param  ?string  $message  null khi màn kết quả chỉ hiện dạng che
      */
     public function __construct(

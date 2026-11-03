@@ -51,7 +51,7 @@ use UnitEnum;
 /**
  * Phiếu xuất trong panel (phương án A của prototype): form Filament chuẩn → modal xác nhận →
  * màn kết quả → trang xem phiếu. Adapter mỏng: kiểm tra, tồn, tạo phiếu và nội dung đều gọi
- * module Kho (ManualDispatch, SellableStock, ContentReveal). Nhập kho không thấy.
+ * module Kho (ManualDispatch, SellableStock, ContentReveal). Cần Quyền Xuất hàng.
  */
 class DispatchResource extends Resource
 {
@@ -237,7 +237,7 @@ class DispatchResource extends Resource
                 ]),
             Livewire::make(DispatchDeliveries::class, fn (Dispatch $record): array => ['record' => $record])
                 ->key('deliveries'),
-            // Chỉ Quản trị: widget tự chặn ở mount, ẩn ở đây để vai trò khác không thấy cả tiêu đề.
+            // Chỉ Quyền Xem nhật ký: widget tự chặn ở mount, ẩn ở đây để người khác không thấy cả tiêu đề.
             Livewire::make(DispatchRevealLogEntries::class, fn (Dispatch $record): array => ['record' => $record])
                 ->key('reveal-log-entries')
                 ->visible(fn (): bool => DispatchRevealLogEntries::canView()),

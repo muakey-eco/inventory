@@ -2,50 +2,50 @@
 
 namespace App\Inventory\Catalog;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\Batch;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
- * Danh sách Nhà cung cấp: Quản trị và Nhập kho quản lý; Bán hàng không thấy.
+ * Danh sách Nhà cung cấp: chỉ người có Quyền Quản lý Nhà cung cấp quản lý.
  * Tên là duy nhất, không phân biệt hoa thường.
  */
 class SupplierDirectory
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplier
      */
     public function create(User $actor, string $name, ?string $note = null): Supplier
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierManage);
 
         return self::save(new Supplier, $name, $note);
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSupplier
      */
     public function update(User $actor, Supplier $supplier, string $name, ?string $note): Supplier
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierManage);
 
         return self::save($supplier, $name, $note);
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function delete(User $actor, Supplier $supplier): void
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::SupplierManage);
 
         if (Batch::query()->where('supplier_id', $supplier->getKey())->exists()) {
             throw new InvalidSupplier("Nhà cung cấp \"{$supplier->name}\" đã có Lô nhập, không xoá được.");

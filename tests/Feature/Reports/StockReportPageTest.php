@@ -2,7 +2,6 @@
 
 use App\Filament\Pages\StockReportPage;
 use App\Filament\Widgets\StockAlerts;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -25,9 +24,9 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
 
     // Netflix: 3 Slot Tồn bán được, Ngưỡng sắp hết 5.
     $this->netflix = productOf(
@@ -68,20 +67,20 @@ beforeEach(function () {
     )));
 });
 
-it('cả ba vai trò vào được báo cáo Tồn kho và thấy widget cảnh báo; nhân viên không có vai trò thì không', function (?Role $role, bool $sees) {
-    $this->actingAs($role === null ? User::factory()->create() : staffMember($role));
+it('cả ba vai trò vào được báo cáo Tồn kho và thấy widget cảnh báo; nhân viên không có vai trò thì không', function (?string $role, bool $sees) {
+    $this->actingAs($role === null ? User::factory()->create() : staffInRole($role));
 
     $this->get(StockReportPage::getUrl())->assertStatus($sees ? 200 : 403);
     expect(StockAlerts::canView())->toBe($sees);
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, true],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', true],
     'không vai trò' => [null, false],
 ]);
 
-it('Bán hàng không thấy cột giá trị và bộ lọc Nhà cung cấp', function (Role $role, bool $values) {
-    $this->actingAs(staffMember($role));
+it('Bán hàng không thấy cột giá trị và bộ lọc Nhà cung cấp', function (string $role, bool $values) {
+    $this->actingAs(staffInRole($role));
 
     $page = Livewire::test(StockReportPage::class)
         ->assertCanSeeTableRecords([$this->netflix, $this->steam, $this->spotify]);
@@ -95,9 +94,9 @@ it('Bán hàng không thấy cột giá trị và bộ lọc Nhà cung cấp', f
     $alerts = Livewire::test(StockAlerts::class);
     $values ? $alerts->assertTableColumnVisible('expiring_cost') : $alerts->assertTableColumnHidden('expiring_cost');
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('bảng hiện số liệu của StockReport; lọc sắp hết, Hết hạn trong N ngày, Sản phẩm', function () {

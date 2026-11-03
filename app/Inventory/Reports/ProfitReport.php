@@ -2,8 +2,9 @@
 
 namespace App\Inventory\Reports;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\User;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ use stdClass;
  * Mọi con số luôn tính lại theo dữ liệu hiện tại, nên sửa Giá bán hay Khôi phục hàng Lỗi làm đổi cả
  * số của một kỳ đã qua.
  *
- * Chỉ Quản trị. Xem hay xuất báo cáo không ghi nhật ký.
+ * Cần Quyền Xem Lãi/lỗ. Xem hay xuất báo cáo không ghi nhật ký.
  */
 class ProfitReport
 {
@@ -39,11 +40,11 @@ class ProfitReport
         'reimbursement' => 'adjustments',
     ];
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function canView(User $user): bool
     {
-        return $this->roles->allows($user);
+        return $this->gate->allows($user, Permission::ReportProfit);
     }
 
     /**
@@ -52,11 +53,11 @@ class ProfitReport
      *
      * @return list<ProfitReportRow>
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function rows(User $actor, ProfitReportFilter $filter): array
     {
-        $this->roles->authorize($actor);
+        $this->gate->authorize($actor, Permission::ReportProfit);
 
         $products = array_map(
             fn (stdClass $record): ProfitReportRow => ProfitReportRow::fromRecord($record),
@@ -103,7 +104,7 @@ class ProfitReport
     /**
      * File báo cáo, gồm cả dòng tổng và dòng 'Chưa có Giá bán'. Không ghi nhật ký.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function export(User $actor, ProfitReportFilter $filter, ReportFormat $format): ReportExport
     {

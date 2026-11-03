@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\StockForm;
@@ -41,9 +40,9 @@ beforeEach(function () {
     Storage::fake('intake');
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
-    $this->stocker = staffMember(Role::Importer);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->stocker = staffInRole('importer');
+    $this->seller = staffInRole('sale');
     $this->report = app(DefectRateReport::class);
 
     $this->netflix = productOf(
@@ -307,11 +306,11 @@ it('chỉ Quản trị và Nhập kho xem được', function () {
     }
 
     expect($this->report->canView($this->seller))->toBeFalse()
-        ->and(fn () => $this->report->rows($this->seller, septemberDefectRange()))->toThrow(MissingRole::class)
-        ->and(fn () => $this->report->export($this->seller, septemberDefectRange(), ReportFormat::Csv))->toThrow(MissingRole::class);
+        ->and(fn () => $this->report->rows($this->seller, septemberDefectRange()))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->report->export($this->seller, septemberDefectRange(), ReportFormat::Csv))->toThrow(MissingPermission::class);
 
     $this->stocker->forceFill(['deactivated_at' => now()])->save();
-    expect(fn () => $this->report->rows($this->stocker, septemberDefectRange()))->toThrow(MissingRole::class);
+    expect(fn () => $this->report->rows($this->stocker, septemberDefectRange()))->toThrow(MissingPermission::class);
 });
 
 it('xuất CSV, không ghi Nhật ký xem mã hay Nhật ký bảo mật', function () {

@@ -1,8 +1,7 @@
 <?php
 
 use App\Filament\Pages\DispatchFreezePage;
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Catalog\SupplierDirectory;
@@ -42,8 +41,8 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
     $this->travelTo(CarbonImmutable::parse('2026-09-17 10:00'));
 
-    $this->admin = staffMember(Role::Admin);
-    $this->seller = staffMember(Role::Sale);
+    $this->admin = staffInRole('admin');
+    $this->seller = staffInRole('sale');
     $this->freeze = app(DispatchFreeze::class);
     $this->manual = app(ManualDispatch::class);
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
@@ -143,13 +142,13 @@ it('tắt Tạm dừng xuất kho thì xuất kho lại được, và ghi Nhật
 });
 
 it('chỉ Quản trị bật hoặc tắt, và phải nhập lý do', function () {
-    expect(fn () => $this->freeze->freeze($this->seller, 'Nghi lộ nội dung'))->toThrow(MissingRole::class)
+    expect(fn () => $this->freeze->freeze($this->seller, 'Nghi lộ nội dung'))->toThrow(MissingPermission::class)
         ->and(fn () => $this->freeze->freeze($this->admin, '   '))->toThrow(InvalidDispatch::class, 'phải nhập lý do')
         ->and($this->freeze->state()->isFrozen())->toBeFalse();
 
     $this->freeze->freeze($this->admin, 'Nghi lộ nội dung');
 
-    expect(fn () => $this->freeze->unfreeze($this->seller, 'Xong'))->toThrow(MissingRole::class)
+    expect(fn () => $this->freeze->unfreeze($this->seller, 'Xong'))->toThrow(MissingPermission::class)
         ->and($this->freeze->state()->isFrozen())->toBeTrue();
 });
 

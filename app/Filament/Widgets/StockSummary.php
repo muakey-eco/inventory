@@ -12,11 +12,11 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 /**
  * Tồn kho gọn trong ba con số, trên trang Tổng quan. Không nằm trong {@see OutboundQueue} hay
- * {@see IntakeQueue} được vì cả ba Vai trò đều xem tồn kho, còn hai widget kia mỗi cái của một công
+ * {@see IntakeQueue} được vì ai có Quyền Xem hàng và báo cáo tồn cũng xem tồn kho, còn hai widget kia mỗi cái của một công
  * việc.
  *
- * Không ô tiền nào: {@see StockReport::seesCost()} chỉ mở cho Nhập kho, mà một ô hiện/ẩn theo người
- * xem làm bố cục co giãn theo Vai trò. Tồn bán được và Tồn lỗi đứng cạnh nhau là có chủ ý — CONTEXT.md
+ * Không ô tiền nào: {@see StockReport::seesCost()} chỉ mở cho Quyền Xem giá vốn và Nhà cung cấp, mà
+ * một ô hiện/ẩn theo người xem làm bố cục co giãn theo Quyền. Tồn bán được và Tồn lỗi đứng cạnh nhau là có chủ ý — CONTEXT.md
  * tách hai khái niệm này, để cạnh nhau là thấy ngay hàng nào bán được và hàng nào chỉ còn nằm đó.
  */
 class StockSummary extends StatsOverviewWidget

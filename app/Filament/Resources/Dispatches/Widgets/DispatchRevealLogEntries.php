@@ -13,10 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
 
 /**
- * Nội dung các Slot của một Phiếu xuất đã được xem bởi ai, khi nào. Chỉ Quản trị thấy.
+ * Nội dung các Slot của một Phiếu xuất đã được xem bởi ai, khi nào. Chỉ người có Quyền Xem nhật ký thấy.
  *
  * Liệt kê **mọi** lượt xem của các Slot đã giao, bất kể Ngữ cảnh xem mã: Giao hàng, Báo lỗi,
- * Đổi hàng, Khiếu nại nhà cung cấp, hay Quản trị xem lúc hàng còn trong kho. Mục đích là điều
+ * Đổi hàng, Khiếu nại nhà cung cấp, hay xem lúc hàng còn trong kho. Mục đích là điều
  * tra rò rỉ, mà ai xem qua đường nào thì cũng đã thấy mã của khách; cột Ngữ cảnh cho biết lượt
  * xem đi qua đâu. Ngữ cảnh Lô nhập không lọt vào đây được: dòng bị bỏ khi nhập không thành Slot
  * nên dòng nhật ký của nó không gắn Slot nào.

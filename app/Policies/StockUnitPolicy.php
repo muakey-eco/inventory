@@ -2,26 +2,26 @@
 
 namespace App\Policies;
 
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\StockUnit;
 use App\Models\User;
 
 /**
- * Đơn vị hàng: mọi Vai trò xem danh sách ở dạng che; chỉ tạo qua nhập hàng.
+ * Đơn vị hàng: Quyền Xem hàng và báo cáo tồn xem danh sách ở dạng che; chỉ tạo qua nhập hàng.
  */
 class StockUnitPolicy
 {
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     public function view(User $user, StockUnit $stockUnit): bool
     {
-        return $this->roles->allows($user, Role::Importer, Role::Sale);
+        return $this->gate->allows($user, Permission::StockView);
     }
 
     public function create(User $user): bool

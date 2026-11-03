@@ -1,7 +1,6 @@
 <?php
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
+use App\Inventory\Access\MissingPermission;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\ContentFieldType;
 use App\Inventory\Catalog\InvalidSupplier;
@@ -45,7 +44,7 @@ beforeEach(function () {
     app(KeyFingerprints::class)->register();
 
     $this->intake = app(BatchIntake::class);
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
 });
 
@@ -162,7 +161,7 @@ function pasteBatch(Product $product, string $content, int $unitCost = 95_000, s
 
 it('Nhập kho dán Mã dùng một lần, xem trước rồi xác nhận thì hàng vào kho', function () {
     $product = steamWallet();
-    $clerk = staffMember(Role::Importer);
+    $clerk = staffInRole('importer');
 
     $batch = $this->intake->submit($clerk, pasteBatch($product, "AAAA-BBBB-CCCC\n\nDDDD-EEEE-FFFF\n"));
 
@@ -450,7 +449,7 @@ it('nội dung chờ xác nhận nằm mã hoá trên disk nhập hàng, xoá kh
         ->and(Batch::findOrFail($discarded->id)->status)->toBe(BatchStatus::Discarded)
         ->and(fn () => $this->intake->confirm($this->admin, $discarded))->toThrow(InvalidBatch::class, 'Lô nhập đã bị bỏ.')
         ->and(fn () => $this->intake->discard($this->admin, $confirmed))->toThrow(InvalidBatch::class, 'Lô nhập đã xác nhận, không bỏ được.')
-        ->and(fn () => $this->intake->discard(staffMember(Role::Sale), $discarded))->toThrow(MissingRole::class);
+        ->and(fn () => $this->intake->discard(staffInRole('sale'), $discarded))->toThrow(MissingPermission::class);
 });
 
 it('bản kiểm tra chưa xác nhận quá 24 giờ: không xác nhận được, lệnh dọn xoá nội dung tạm và file upload tạm', function () {
@@ -557,7 +556,7 @@ it('chỉ sửa được Lô nhập đang Chờ xác nhận, và sửa không gi
     $this->intake->discard($this->admin, $discarded);
     $pending = $this->intake->submit($this->admin, pasteBatch(steamWallet('STEAM-300K'), 'EEEE-FFFF'));
 
-    expect(fn () => $this->intake->revise(staffMember(Role::Sale), $pending, revisionOf($pending)))->toThrow(MissingRole::class)
+    expect(fn () => $this->intake->revise(staffInRole('sale'), $pending, revisionOf($pending)))->toThrow(MissingPermission::class)
         ->and(fn () => $this->intake->revise($this->admin, $confirmed, revisionOf($confirmed)))
         ->toThrow(InvalidBatch::class, 'Lô nhập đã xác nhận và đã đóng.')
         ->and(fn () => $this->intake->revise($this->admin, $discarded, revisionOf($discarded)))
@@ -783,7 +782,7 @@ it('DB chặn hai Đơn vị hàng Mã dùng một lần cùng Khoá chống tr�
 });
 
 it('mỗi Đơn vị hàng và Slot vừa tạo ghi đúng một dòng Sổ biến động kho', function () {
-    $clerk = staffMember(Role::Importer);
+    $clerk = staffInRole('importer');
     $batch = $this->intake->submit($clerk, pasteBatch(steamWallet(), "AAAA-BBBB\nCCCC-DDDD"));
     $this->intake->confirm($clerk, $batch);
 
@@ -807,14 +806,14 @@ it('mỗi Đơn vị hàng và Slot vừa tạo ghi đúng một dòng Sổ bi�
 
 it('Bán hàng không tạo, không xem trước, không xác nhận được Lô nhập', function () {
     $product = steamWallet();
-    $seller = staffMember(Role::Sale);
+    $seller = staffInRole('sale');
 
-    expect(fn () => $this->intake->submit($seller, pasteBatch($product, 'AAAA')))->toThrow(MissingRole::class);
+    expect(fn () => $this->intake->submit($seller, pasteBatch($product, 'AAAA')))->toThrow(MissingPermission::class);
 
     $batch = $this->intake->submit($this->admin, pasteBatch($product, 'AAAA'));
 
-    expect(fn () => $this->intake->preview($seller, $batch))->toThrow(MissingRole::class)
-        ->and(fn () => $this->intake->confirm($seller, $batch))->toThrow(MissingRole::class)
+    expect(fn () => $this->intake->preview($seller, $batch))->toThrow(MissingPermission::class)
+        ->and(fn () => $this->intake->confirm($seller, $batch))->toThrow(MissingPermission::class)
         ->and(Batch::count())->toBe(1)
         ->and(StockUnit::count())->toBe(0);
 });

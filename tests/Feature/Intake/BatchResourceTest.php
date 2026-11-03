@@ -6,7 +6,6 @@ use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Filament\Resources\Batches\Pages\ViewBatch;
 use App\Filament\Resources\StockUnits\Pages\ListStockUnits;
 use App\Filament\Resources\StockUnits\StockUnitResource;
-use App\Inventory\Access\Role;
 use App\Inventory\Catalog\ContentFieldDraft;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Catalog\SupplierDirectory;
@@ -36,7 +35,7 @@ beforeEach(function () {
     Repeater::fake();
     app(KeyFingerprints::class)->register();
 
-    $this->admin = staffMember(Role::Admin);
+    $this->admin = staffInRole('admin');
     $this->supplier = app(SupplierDirectory::class)->create($this->admin, 'Kinguin');
     $this->product = productOf(
         StockForm::OneTimeCode,
@@ -63,20 +62,20 @@ function validatingBatch(): Batch
     return $batch;
 }
 
-it('Quản trị và Nhập kho vào được trang Lô nhập, Bán hàng thì không; mọi Vai trò xem được Đơn vị hàng', function (Role $role, bool $seesBatches) {
-    $this->actingAs(staffMember($role));
+it('Quản trị và Nhập kho vào được trang Lô nhập, Bán hàng thì không; mọi Vai trò xem được Đơn vị hàng', function (string $role, bool $seesBatches) {
+    $this->actingAs(staffInRole($role));
 
     $this->get(BatchResource::getUrl('index'))->assertStatus($seesBatches ? 200 : 403);
     $this->get(BatchResource::getUrl('create'))->assertStatus($seesBatches ? 200 : 403);
     $this->get(StockUnitResource::getUrl('index'))->assertOk();
 })->with([
-    'Quản trị' => [Role::Admin, true],
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, false],
+    'Quản trị' => ['admin', true],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('Nhập kho dán hàng từ panel, xem trước rồi xác nhận', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
 
     Livewire::test(CreateBatch::class)
         ->fillForm([
@@ -111,7 +110,7 @@ it('Nhập kho tạo nhanh Nhà cung cấp, upload file Tài khoản kèm Dòng 
     // Upload tạm trên S3 như production: file chỉ đọc được qua disk, Livewire không tự dọn.
     config(['livewire.temporary_file_upload.disk' => 's3']);
     $uploads = fakeObjectStorage(FileUploadConfiguration::disk());
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     $intake = app(BatchIntake::class);
     $intake->confirm($this->admin, $intake->submit($this->admin, new BatchDraft($this->supplier, CarbonImmutable::parse('2026-09-15'), [new BatchLineDraft($this->product, 1, 'AAAA-BBBB')])));
     $netflix = productOf(
@@ -184,7 +183,7 @@ it('Nhập kho tạo nhanh Nhà cung cấp, upload file Tài khoản kèm Dòng 
 });
 
 it('Nhập kho sửa Giá trị áp cho Đơn vị hàng ở màn xem trước rồi kiểm tra lại, không phải dán lại nội dung', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     $netflix = productOf(
         StockForm::Account,
         [new ContentFieldDraft('username', 'Tên đăng nhập', dedupeKey: true, sensitive: false), new ContentFieldDraft('password', 'Mật khẩu')],
@@ -237,7 +236,7 @@ it('Nhập kho sửa Giá trị áp cho Đơn vị hàng ở màn xem trước r
 });
 
 it('màn xem Lô nhập tự hiện kết quả khi job kiểm tra xong, nhân viên không phải bấm gì', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     $batch = validatingBatch();
 
     $page = Livewire::test(ViewBatch::class, ['record' => $batch->getRouteKey()])
@@ -258,7 +257,7 @@ it('màn xem Lô nhập tự hiện kết quả khi job kiểm tra xong, nhân v
 });
 
 it('màn xem Lô nhập tự hiện lý do khi job kiểm tra thất bại', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     $batch = validatingBatch();
 
     $page = Livewire::test(ViewBatch::class, ['record' => $batch->getRouteKey()])->assertSeeHtml('wire:poll');
@@ -273,7 +272,7 @@ it('màn xem Lô nhập tự hiện lý do khi job kiểm tra thất bại', fun
 });
 
 it('Nhập kho bỏ Lô nhập chưa xác nhận từ panel', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     $batch = app(BatchIntake::class)->submit($this->admin, new BatchDraft($this->supplier, CarbonImmutable::parse('2026-09-15'), [new BatchLineDraft($this->product, 1, 'AAAA-BBBB')]));
 
     Livewire::test(ViewBatch::class, ['record' => $batch->getRouteKey()])
@@ -292,7 +291,7 @@ it('Quản trị Huỷ nhập từ panel sau khi xem số lượng sẽ huỷ v�
     // Chưa có Giữ hàng trong module: đặt trạng thái trực tiếp.
     Slot::whereKey(Slot::orderBy('id')->firstOrFail()->id)->update(['status' => SlotStatus::Reserved]);
 
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
 
     Livewire::test(ViewBatch::class, ['record' => $batch->getRouteKey()])->assertActionHidden('reverse');
 
@@ -317,7 +316,7 @@ it('Quản trị Huỷ nhập từ panel sau khi xem số lượng sẽ huỷ v�
 });
 
 it('panel báo lỗi nghiệp vụ và không tạo Lô nhập khi khoá mã hoá không khớp', function () {
-    $this->actingAs(staffMember(Role::Importer));
+    $this->actingAs(staffInRole('importer'));
     config(['inventory.keys.hmac' => '1:base64:+aDuV69xpMmq8HrVKo6jtB43YKS+Sd8UDwlDy4k5kgk=']);
 
     Livewire::test(CreateBatch::class)
@@ -337,7 +336,7 @@ it('panel báo lỗi nghiệp vụ và không tạo Lô nhập khi khoá mã ho�
     expect(Batch::count())->toBe(0);
 });
 
-it('danh sách Đơn vị hàng hiện nội dung dạng che; Bán hàng không thấy Giá vốn và Nhà cung cấp', function (Role $role, bool $seesCost) {
+it('danh sách Đơn vị hàng hiện nội dung dạng che; Bán hàng không thấy Giá vốn và Nhà cung cấp', function (string $role, bool $seesCost) {
     $intake = app(BatchIntake::class);
     $batch = $intake->submit($this->admin, new BatchDraft(
         supplier: $this->supplier,
@@ -346,7 +345,7 @@ it('danh sách Đơn vị hàng hiện nội dung dạng che; Bán hàng không 
     ));
     $intake->confirm($this->admin, $batch);
 
-    $this->actingAs(staffMember($role));
+    $this->actingAs(staffInRole($role));
 
     Livewire::test(ListStockUnits::class)
         ->assertCanSeeTableRecords(StockUnit::all())
@@ -357,8 +356,8 @@ it('danh sách Đơn vị hàng hiện nội dung dạng che; Bán hàng không 
 
     expect(Product::withCount('inStockSlots')->find($this->product->id)->in_stock_slots_count)->toBe(1);
 })->with([
-    'Nhập kho' => [Role::Importer, true],
-    'Bán hàng' => [Role::Sale, false],
+    'Nhập kho' => ['importer', true],
+    'Bán hàng' => ['sale', false],
 ]);
 
 it('lọc Lô nhập theo Trạng thái', function () {

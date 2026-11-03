@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Dispatch;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Models\ApiKey;
 use App\Models\Dispatch;
 use App\Models\SalesChannel;
@@ -12,7 +12,7 @@ use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
- * Danh mục Kênh bán: chỉ Quản trị khai báo, sửa, ẩn. Kênh không bao giờ bị xoá vì Phiếu xuất
+ * Danh mục Kênh bán: chỉ người có Quyền Quản lý Kênh bán khai báo, sửa, ẩn. Kênh không bao giờ bị xoá vì Phiếu xuất
  * tham chiếu tới nó; tên là duy nhất, không phân biệt hoa thường.
  */
 class SalesChannelDirectory
@@ -22,26 +22,26 @@ class SalesChannelDirectory
      */
     private const MAX_HOLD_MINUTES = 1_440;
 
-    public function __construct(private RoleGate $roles) {}
+    public function __construct(private PermissionGate $gate) {}
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSalesChannel
      */
     public function create(User $actor, SalesChannelDraft $draft): SalesChannel
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::SalesChannelManage);
 
         return self::save(new SalesChannel, $draft);
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidSalesChannel
      */
     public function update(User $actor, SalesChannel $channel, SalesChannelDraft $draft): SalesChannel
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::SalesChannelManage);
 
         return self::save($channel, $draft);
     }
@@ -49,21 +49,21 @@ class SalesChannelDirectory
     /**
      * Ngừng dùng: kênh không còn chọn được khi tạo Phiếu xuất, và Khoá API của kênh hết gọi vào kho được.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function hide(User $actor, SalesChannel $channel): void
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::SalesChannelManage);
 
         $channel->forceFill(['hidden_at' => $channel->hidden_at ?? now()])->save();
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function unhide(User $actor, SalesChannel $channel): void
     {
-        $this->roles->authorize($actor, Role::Admin);
+        $this->gate->authorize($actor, Permission::SalesChannelManage);
 
         $channel->forceFill(['hidden_at' => null])->save();
     }
@@ -112,7 +112,7 @@ class SalesChannelDirectory
                 'requires_sale_price' => $draft->requiresSalePrice ?? ($draft->type === SalesChannelType::Api),
             ])->save();
         } catch (UniqueConstraintViolationException) {
-            // Hai Quản trị cùng tạo một tên: unique index trên lower(name) bắt trường hợp đồng thời.
+            // Hai người cùng tạo một tên: unique index trên lower(name) bắt trường hợp đồng thời.
             throw self::nameTaken($name);
         }
 

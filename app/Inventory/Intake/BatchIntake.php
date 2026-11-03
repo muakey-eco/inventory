@@ -2,9 +2,9 @@
 
 namespace App\Inventory\Intake;
 
-use App\Inventory\Access\MissingRole;
-use App\Inventory\Access\Role;
-use App\Inventory\Access\RoleGate;
+use App\Inventory\Access\MissingPermission;
+use App\Inventory\Access\Permission;
+use App\Inventory\Access\PermissionGate;
 use App\Inventory\Catalog\StockForm;
 use App\Inventory\Encryption\ContentCrypto;
 use App\Inventory\Encryption\KeyFingerprintMismatch;
@@ -47,7 +47,7 @@ class BatchIntake
     private const SLOT_INSERT_CHUNK = 5_000;
 
     public function __construct(
-        private RoleGate $roles,
+        private PermissionGate $gate,
         private KeyFingerprints $fingerprints,
         private ContentCrypto $crypto,
         private SourceReader $reader,
@@ -60,13 +60,13 @@ class BatchIntake
     /**
      * Tạo Lô nhập ở trạng thái Đang kiểm tra và đưa job pha 1 vào queue.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws KeyFingerprintMismatch
      * @throws InvalidBatch
      */
     public function submit(User $actor, BatchDraft $draft): Batch
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::Intake);
         self::validateDraft($draft);
         $this->fingerprints->verify();
         self::ensureDedupeKeysSettled();
@@ -132,13 +132,13 @@ class BatchIntake
      * nhất và Khoá chống trùng tính theo nó, nên giữ nguyên mới là điểm chính. Hạn 24 giờ của bản
      * kiểm tra vẫn tính từ lúc tạo Lô nhập: sửa không gia hạn thời gian nội dung tạm nằm trên ổ.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws KeyFingerprintMismatch
      * @throws InvalidBatch
      */
     public function revise(User $actor, Batch $batch, BatchRevision $revision): Batch
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::Intake);
         $this->fingerprints->verify();
         self::ensureDedupeKeysSettled();
 
@@ -223,11 +223,11 @@ class BatchIntake
     }
 
     /**
-     * @throws MissingRole
+     * @throws MissingPermission
      */
     public function preview(User $actor, Batch $batch): BatchPreview
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::Intake);
 
         $batch = Batch::query()->with('lines.product')->findOrFail($batch->getKey());
 
@@ -265,13 +265,13 @@ class BatchIntake
      * thành trùng lúc ghi (Lô nhập khác vừa nhập cùng mã): khi đó không ghi gì, kết quả xem
      * trước được cập nhật để nhân viên xem lại và tick.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws KeyFingerprintMismatch
      * @throws InvalidBatch
      */
     public function confirm(User $actor, Batch $batch, bool $skipStockDuplicates = false): Batch
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::Intake);
         $this->fingerprints->verify();
         self::ensureDedupeKeysSettled();
 
@@ -373,12 +373,12 @@ class BatchIntake
     /**
      * Bỏ bản kiểm tra chưa xác nhận: nội dung tạm bị xoá, Lô nhập giữ lại với trạng thái Đã bỏ.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidBatch
      */
     public function discard(User $actor, Batch $batch): Batch
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::Intake);
 
         return DB::transaction(function () use ($batch): Batch {
             $current = Batch::query()->lockForUpdate()->findOrFail($batch->getKey());
@@ -424,13 +424,13 @@ class BatchIntake
 
     /**
      * Các Dòng nhập có dòng bị bỏ mà nhân viên tải được lúc này; rỗng khi không phải người tạo,
-     * thiếu Vai trò hoặc đã qua màn xem trước và thời hạn ngay sau xác nhận.
+     * thiếu Quyền hoặc đã qua màn xem trước và thời hạn ngay sau xác nhận.
      *
      * @return Collection<int, BatchLine>
      */
     public function downloadableRejectedLines(User $actor, Batch $batch): Collection
     {
-        if (! $this->roles->allows($actor, Role::Importer)
+        if (! $this->gate->allows($actor, Permission::Intake)
             || (int) $batch->created_by !== (int) $actor->getKey()
             || ! self::isRejectedDownloadOpen($batch)) {
             return new Collection;
@@ -449,12 +449,12 @@ class BatchIntake
      * Lô nhập tải được, ở màn xem trước hoặc ngay sau khi xác nhận; mỗi lần tải ghi Nhật ký
      * xem mã với ngữ cảnh Lô nhập trong cùng transaction, trước khi trả nội dung.
      *
-     * @throws MissingRole
+     * @throws MissingPermission
      * @throws InvalidBatch
      */
     public function rejectedLines(User $actor, BatchLine $line): RejectedLinesExport
     {
-        $this->roles->authorize($actor, Role::Importer);
+        $this->gate->authorize($actor, Permission::Intake);
 
         return DB::transaction(function () use ($actor, $line): RejectedLinesExport {
             $line = BatchLine::query()->with(['batch', 'product'])->findOrFail($line->getKey());

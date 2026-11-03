@@ -1,5 +1,7 @@
 # Authentik làm chủ cả xác thực lẫn Vai trò, kho chỉ nhận theo
 
+_Đã bị thay bởi ADR 0011._
+
 Kho không còn tự quản đăng nhập hay phân quyền. Nhân viên đăng nhập qua Authentik bằng OIDC, đó là đường duy nhất: không còn mật khẩu, không còn TOTP trong app, không có đường phá kính. Mỗi **Vai trò** ứng với một group trên Authentik. Kho giữ bản sao Vai trò để Policy/Gate chạy như cũ, và cập nhật bản sao này mỗi lần đăng nhập, cộng thêm một lần đối soát mỗi phút qua API Authentik chỉ đọc. Mục tiêu là shop quản nhân viên ở một chỗ cho mọi công cụ nội bộ.
 
 ## Considered Options
